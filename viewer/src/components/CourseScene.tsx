@@ -10,12 +10,26 @@ import {
   type RenderBounds,
 } from "../lib/renderCoordinates";
 import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCameraPosition } from "../lib/cameraFraming";
+import { displayCoordinatesToRenderVector } from "../lib/renderTransform";
+import type { ProjectedLapPayload, ProjectedLapPoint } from "../lib/telemetryLap";
+
+const MUTED_SECTION_COLOR = "#343b44";
+const MUTED_MARKER_COLOR = "#7b8490";
+const NON_SELECTED_OPACITY = 0.26;
+const SELECTED_REFERENCE_WIDTH = 9;
+const SELECTED_ACTUAL_WIDTH = 11;
+const REFERENCE_HALO_WIDTH = 17;
+const ACTUAL_HALO_WIDTH = 19;
+const MUTED_LINE_WIDTH = 2;
 
 interface CourseSceneProps {
   reference: ReferencePayload;
   elevationScale: number;
   selectedSectionId: SectionId;
   viewMode: "2d" | "3d";
+  projectedLap?: ProjectedLapPayload | null;
+  showReference: boolean;
+  showActual: boolean;
 }
 
 export function CourseScene({
@@ -23,6 +37,9 @@ export function CourseScene({
   elevationScale,
   selectedSectionId,
   viewMode,
+  projectedLap,
+  showReference,
+  showActual,
 }: CourseSceneProps) {
   const bounds = useMemo(
     () => referencePointsToRenderBounds(reference.points, elevationScale),
@@ -50,8 +67,11 @@ export function CourseScene({
       />
       <CourseLines
         reference={reference}
+        projectedLap={projectedLap}
         elevationScale={elevationScale}
         selectedSectionId={selectedSectionId}
+        showReference={showReference}
+        showActual={showActual}
       />
       <SceneControls bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
     </Canvas>
@@ -160,12 +180,18 @@ function applyCameraPose(
 
 function CourseLines({
   reference,
+  projectedLap,
   elevationScale,
   selectedSectionId,
+  showReference,
+  showActual,
 }: {
   reference: ReferencePayload;
+  projectedLap?: ProjectedLapPayload | null;
   elevationScale: number;
   selectedSectionId: SectionId;
+  showReference: boolean;
+  showActual: boolean;
 }) {
   const sectionPoints = useMemo(() => {
     const grouped = new Map<SectionId, ReferencePointTuple[]>();
@@ -177,6 +203,16 @@ function CourseLines({
     }
     return grouped;
   }, [reference]);
+
+  const actualSectionPoints = useMemo(() => {
+    const grouped = new Map<SectionId, ProjectedLapPoint[]>();
+    for (const point of projectedLap?.points ?? []) {
+      const points = grouped.get(point.sectionId) ?? [];
+      points.push(point);
+      grouped.set(point.sectionId, points);
+    }
+    return grouped;
+  }, [projectedLap]);
 
   const markerPoints = useMemo(() => {
     return reference.markers
@@ -192,32 +228,116 @@ function CourseLines({
 
   return (
     <group>
-      {reference.sections.map((section) => {
+      {showReference ? reference.sections.flatMap((section) => {
         const points = sectionPoints.get(section.id) ?? [];
-        return (
+        const renderedPoints = points.map((point) => referencePointToRenderVector(point, elevationScale));
+        const isSelected = section.id === selectedSectionId;
+        const mainLine = (
           <Line
             key={section.id}
-            points={points.map((point) => referencePointToRenderVector(point, elevationScale))}
-            color={SECTION_COLORS[section.id]}
-            lineWidth={section.id === selectedSectionId ? 7 : 3}
+            points={renderedPoints}
+            color={isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
+            lineWidth={isSelected ? SELECTED_REFERENCE_WIDTH : MUTED_LINE_WIDTH}
             transparent
-            opacity={section.id === selectedSectionId ? 1 : 0.42}
+            opacity={isSelected ? 1 : NON_SELECTED_OPACITY}
+          />
+        );
+        if (!isSelected) {
+          return [mainLine];
+        }
+        return [
+          <Line
+            key={`${section.id}-halo`}
+            points={renderedPoints}
+            color={SECTION_COLORS[section.id]}
+            lineWidth={REFERENCE_HALO_WIDTH}
+            transparent
+            opacity={0.22}
+          />,
+          mainLine,
+        ];
+      }) : null}
+      {showActual && projectedLap ? reference.sections.flatMap((section) => {
+        const points = actualSectionPoints.get(section.id) ?? [];
+        if (points.length === 0) {
+          return [];
+        }
+        const renderedPoints = points.map((point) => projectedLapPointToRenderVector(point, elevationScale));
+        const isSelected = section.id === selectedSectionId;
+        const mainLine = (
+          <Line
+            key={`actual-${section.id}`}
+            points={renderedPoints}
+            color={isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
+            lineWidth={isSelected ? SELECTED_ACTUAL_WIDTH : MUTED_LINE_WIDTH}
+            transparent
+            opacity={isSelected ? 1 : NON_SELECTED_OPACITY}
+          />
+        );
+        if (!isSelected) {
+          return [mainLine];
+        }
+        return [
+          <Line
+            key={`actual-${section.id}-halo`}
+            points={renderedPoints}
+            color={SECTION_COLORS[section.id]}
+            lineWidth={ACTUAL_HALO_WIDTH}
+            transparent
+            opacity={0.18}
+          />,
+          mainLine,
+        ];
+      }) : null}
+      {markerPoints.map(({ marker, point }) => {
+        const isBoundary = markerTouchesSection(marker, selectedSectionId);
+        return (
+          <Marker
+            color={isBoundary ? "#ffffff" : MUTED_MARKER_COLOR}
+            key={marker.id}
+            label={marker.label}
+            point={point}
+            elevationScale={elevationScale}
+            labelDimmed={!isBoundary}
+            opacity={isBoundary ? 1 : 0.38}
+            scale={isBoundary ? 1.12 : 0.78}
           />
         );
       })}
-      {markerPoints.map(({ marker, point }) => (
-        <Marker
-          color="#ffffff"
-          key={marker.id}
-          label={marker.label}
-          point={point}
-          elevationScale={elevationScale}
-        />
-      ))}
+      {showActual && projectedLap ? projectedLap.markers.map((point) => {
+        const isBoundary = actualMarkerTouchesSection(reference, point.manualMarkerId, selectedSectionId);
+        return (
+          <Marker
+            color={isBoundary ? "#f8fafc" : MUTED_MARKER_COLOR}
+            key={`actual-marker-${point.manualMarkerId}-${point.sourceRowIndex}`}
+            label={point.manualMarkerId}
+            position={projectedLapPointToRenderVector(point, elevationScale)}
+            labelDimmed={!isBoundary}
+            opacity={isBoundary ? 1 : 0.38}
+            scale={isBoundary ? 1.12 : 0.78}
+          />
+        );
+      }) : null}
       <Marker color="#35f28b" label="START" point={startPoint} elevationScale={elevationScale} />
       <Marker color="#ff4f64" label="FINISH" point={finishPoint} elevationScale={elevationScale} />
     </group>
   );
+}
+
+function markerTouchesSection(
+  marker: ReferencePayload["markers"][number],
+  selectedSectionId: SectionId,
+): boolean {
+  return marker.from_section_id === selectedSectionId || marker.to_section_id === selectedSectionId;
+}
+
+function actualMarkerTouchesSection(
+  reference: ReferencePayload,
+  markerId: string,
+  selectedSectionId: SectionId,
+): boolean {
+  const referenceMarker = reference.markers.find((marker) => marker.id === markerId);
+  return referenceMarker ? markerTouchesSection(referenceMarker, selectedSectionId) : false;
 }
 
 function Marker({
@@ -225,22 +345,45 @@ function Marker({
   label,
   point,
   elevationScale,
+  position,
+  labelDimmed = false,
+  opacity = 1,
+  scale = 1,
 }: {
   color: string;
   label: string;
-  point: ReferencePointTuple;
-  elevationScale: number;
+  point?: ReferencePointTuple;
+  elevationScale?: number;
+  position?: THREE.Vector3;
+  labelDimmed?: boolean;
+  opacity?: number;
+  scale?: number;
 }) {
-  const position = referencePointToRenderVector(point, elevationScale);
+  const markerPosition = position ?? referencePointToRenderVector(point!, elevationScale!);
   return (
-    <group position={position}>
+    <group position={markerPosition}>
       <mesh>
-        <sphereGeometry args={[95, 20, 20]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} />
+        <sphereGeometry args={[95 * scale, 20, 20]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={labelDimmed ? 0.1 : 0.35}
+          opacity={opacity}
+          transparent={opacity < 1}
+        />
       </mesh>
       <Html distanceFactor={11000} position={[0, 260, 0]} center>
-        <span className="scene-label">{label}</span>
+        <span className={labelDimmed ? "scene-label scene-label-dimmed" : "scene-label"}>{label}</span>
       </Html>
     </group>
   );
+}
+function projectedLapPointToRenderVector(point: ProjectedLapPoint, elevationScale: number): THREE.Vector3 {
+  const [renderX, renderY, renderZ] = displayCoordinatesToRenderVector(
+    point.displayX,
+    point.displayY,
+    point.displayZ,
+    elevationScale,
+  );
+  return new THREE.Vector3(renderX, renderY, renderZ);
 }

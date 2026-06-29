@@ -50,7 +50,7 @@
 - [ ] Add license.
 - [x] Add `.gitignore`.
 - [x] Ignore raw telemetry logs.
-- [ ] Add small sanitized sample data.
+- [x] Add small sanitized sample data.
 - [x] Create Python project configuration.
 - [x] Create frontend project configuration.
 - [ ] Pin Python version.
@@ -171,44 +171,44 @@
 
 # 5. Telemetry Import — P0
 
-- [ ] Load telemetry CSV.
-- [ ] Inspect and validate headers.
-- [ ] Handle UTF-8 BOM.
-- [ ] Load session JSON.
+- [x] Load telemetry CSV.
+- [x] Inspect and validate headers.
+- [x] Handle UTF-8 BOM.
+- [x] Load session JSON.
 - [ ] Display session metadata.
-- [ ] Detect candidate laps.
+- [x] Detect candidate laps.
 - [ ] Allow manual lap selection.
-- [ ] Detect incomplete laps.
-- [ ] Detect long pauses.
+- [x] Detect incomplete laps.
+- [x] Detect long pauses.
 - [ ] Detect obvious coordinate jumps.
 - [ ] Flag possible rewind segments.
-- [ ] Add import error messages.
-- [ ] Export normalized session metadata.
+- [x] Add import error messages.
+- [x] Export normalized session metadata.
 
 ---
 
 # 6. Reference-Path Projection — P0
 
 - [ ] Build 3D nearest-neighbor index.
-- [ ] Project telemetry samples to reference path.
-- [ ] Assign course distance.
-- [ ] Assign section ID.
-- [ ] Calculate projection error.
-- [ ] Preserve timestamps.
-- [ ] Enforce temporal continuity.
-- [ ] Prevent jumps to nearby wrong branches.
-- [ ] Handle loop-bridge proximity.
-- [ ] Flag uncertain matches.
-- [ ] Add projection-quality summary.
-- [ ] Export normalized lap data.
+- [x] Project telemetry samples to reference path.
+- [x] Assign course distance.
+- [x] Assign section ID.
+- [x] Calculate projection error.
+- [x] Preserve timestamps.
+- [x] Enforce temporal continuity.
+- [x] Prevent jumps to nearby wrong branches.
+- [x] Handle loop-bridge proximity.
+- [x] Flag uncertain matches.
+- [x] Add projection-quality summary.
+- [x] Export normalized lap data.
 
 ## Tests
 
 - [ ] Exact reference point maps to itself.
 - [ ] Nearby point maps to expected distance.
 - [ ] Outlier receives warning.
-- [ ] Sequence avoids impossible backward jumps.
-- [ ] Loop-bridge samples map to correct branch.
+- [x] Sequence avoids impossible backward jumps.
+- [x] Loop-bridge samples map to correct branch.
 
 ---
 
@@ -439,15 +439,15 @@ For each corner or analysis zone:
 
 # 18. Data Quality — P1
 
-- [ ] Packet count.
-- [ ] Saved packet count.
-- [ ] Ignored/off packet count.
-- [ ] Sampling interval distribution.
-- [ ] Maximum sampling gap.
-- [ ] Missing-field report.
-- [ ] Projection mean error.
-- [ ] Projection maximum error.
-- [ ] Lap completeness.
+- [x] Packet count.
+- [x] Saved packet count.
+- [x] Ignored/off packet count.
+- [x] Sampling interval distribution.
+- [x] Maximum sampling gap.
+- [x] Missing-field report.
+- [x] Projection mean error.
+- [x] Projection maximum error.
+- [x] Lap completeness.
 - [ ] Coordinate jump detection.
 - [ ] Rewind suspicion.
 - [ ] Course-departure suspicion.
@@ -461,15 +461,15 @@ For each corner or analysis zone:
 - [ ] Distance calculation tests.
 - [ ] 1 m resampling tests.
 - [x] Section assignment tests.
-- [ ] Marker detection tests.
-- [ ] Projection tests.
-- [ ] Loop-bridge branch tests.
+- [x] Marker detection tests.
+- [x] Projection tests.
+- [x] Loop-bridge branch tests.
 - [ ] CSV encoding tests.
 - [x] Missing-column tests.
 - [x] Invalid-value tests.
 - [ ] Large-session performance tests.
 - [x] Viewer smoke test.
-- [ ] End-to-end sample workflow test.
+- [x] End-to-end sample workflow test.
 
 ---
 
@@ -485,7 +485,7 @@ For each corner or analysis zone:
 - [ ] Rule-based analysis design.
 - [ ] Data-quality interpretation.
 - [x] Known limitations.
-- [ ] Raw-log and privacy handling.
+- [x] Raw-log and privacy handling.
 
 ---
 

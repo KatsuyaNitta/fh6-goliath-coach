@@ -4,7 +4,7 @@ Browser-based reference-path visualization for the Goliath course in Forza Horiz
 
 This milestone renders the confirmed 1 m sampled Goliath driving path. The path is not an official road centerline, not an ideal racing line, and not complete road geometry. The viewer renders a line only; it does not invent road width, road edges, curbs, guardrails, checkpoints, or terrain.
 
-## Current Milestone A Slice
+## Current Milestone Slice
 
 - Load `data/reference/goliath_reference_1m.csv`.
 - Validate required columns, finite numeric values, and strictly increasing `course_distance_m`.
@@ -14,6 +14,9 @@ This milestone renders the confirmed 1 m sampled Goliath driving path. The path 
 - Export compact browser data to `viewer/public/reference/goliath_reference.json`.
 - Render the sampled driving path in a Vite + React + TypeScript + React Three Fiber viewer.
 - Capture minimal vehicle metadata and Forza-ordered tune values, with JSON save/load.
+- Import one processed Goliath telemetry session from local CSV/JSON files.
+- Extract the completed lap, detect five handbrake section markers, and project the lap onto the reference path.
+- Load a processed `projected-lap.csv` in the viewer and overlay the actual driven path.
 
 ## Reference CSV
 
@@ -72,6 +75,29 @@ python -m pip install -e .
 python -m goliath.cli build-reference data\reference\goliath_reference_1m.csv --output viewer\public\reference\goliath_reference.json
 ```
 
+## Process a Local Telemetry Session
+
+Raw local telemetry stays outside Git. Place session files under:
+
+```text
+data\local\sessions\<session_id>\
+```
+
+For the first integration session:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m goliath.cli process-session data\local\sessions\20260629_184938 --reference data\reference\goliath_reference_1m.csv --output-root data\processed
+```
+
+The command writes generated artifacts under:
+
+```text
+data\processed\20260629_184938\
+```
+
+Large processed outputs are generated locally and ignored by Git.
+
 ## Backend Tests
 
 ```powershell
@@ -107,6 +133,8 @@ Open the local URL printed by Vite. The app loads:
 /reference/goliath_reference.json
 ```
 
+Use the **Load projected lap** control to select a generated `projected-lap.csv` and overlay the actual driven path.
+
 ## Frontend Tests
 
 ```powershell
@@ -114,7 +142,7 @@ cd viewer
 pnpm run test
 ```
 
-The frontend smoke test checks generated reference data and the vehicle/tune metadata design constraints.
+The frontend smoke test checks generated reference data, camera transforms, vehicle/tune metadata constraints, and projected-lap CSV loading.
 
 ## Production Build
 

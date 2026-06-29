@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReferencePayload, SectionDefinition, SectionId } from "./lib/reference";
 import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
 import { VehicleTunePanel } from "./components/VehicleTunePanel";
+import { parseProjectedLapCsv, type ProjectedLapPayload } from "./lib/telemetryLap";
 
 type ViewMode = "3d" | "2d";
 
@@ -13,6 +14,11 @@ export function App() {
   const [elevationScale, setElevationScale] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
   const [cameraResetKey, setCameraResetKey] = useState(0);
+  const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+  const [showReference, setShowReference] = useState(true);
+  const [showActual, setShowActual] = useState(true);
+  const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchReference()
@@ -28,6 +34,24 @@ export function App() {
   const selectedSection = useMemo<SectionDefinition | undefined>(() => {
     return reference?.sections.find((section) => section.id === selectedSectionId);
   }, [reference, selectedSectionId]);
+  const selectedTelemetrySection = useMemo(() => {
+    return projectedLap?.sectionSummaries.find((section) => section.sectionId === selectedSectionId);
+  }, [projectedLap, selectedSectionId]);
+
+  async function handleProjectedLapFile(file: File | undefined): Promise<void> {
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await file.text();
+      setProjectedLap(parseProjectedLapCsv(text, file.name));
+      setTelemetryError(null);
+      setShowActual(true);
+    } catch (caught: unknown) {
+      setTelemetryError(caught instanceof Error ? caught.message : "Failed to load projected lap.");
+      setProjectedLap(null);
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -40,6 +64,9 @@ export function App() {
               elevationScale={elevationScale}
               selectedSectionId={selectedSectionId}
               viewMode={viewMode}
+              projectedLap={projectedLap}
+              showReference={showReference}
+              showActual={showActual}
             />
             <div className="orientation-indicator" aria-label="Map orientation">
               <span>+X -&gt; right</span>
@@ -77,6 +104,65 @@ export function App() {
         <button className="command-button" type="button" onClick={() => setCameraResetKey((key) => key + 1)}>
           Reset camera
         </button>
+
+        <section className="telemetry-panel">
+          <div className="panel-heading">
+            <h2>Telemetry Overlay</h2>
+            <p>Load a processed projected-lap CSV.</p>
+          </div>
+          <input
+            accept=".csv,text/csv"
+            className="hidden-input"
+            onChange={(event) => void handleProjectedLapFile(event.target.files?.[0])}
+            ref={projectedLapInputRef}
+            type="file"
+          />
+          <button
+            className="command-button"
+            type="button"
+            onClick={() => projectedLapInputRef.current?.click()}
+          >
+            Load projected lap
+          </button>
+          <div className="toggle-row">
+            <label>
+              <input
+                checked={showReference}
+                onChange={(event) => setShowReference(event.target.checked)}
+                type="checkbox"
+              />
+              Reference
+            </label>
+            <label>
+              <input
+                checked={showActual}
+                disabled={!projectedLap}
+                onChange={(event) => setShowActual(event.target.checked)}
+                type="checkbox"
+              />
+              Actual
+            </label>
+          </div>
+          {projectedLap ? (
+            <dl className="compact-stats">
+              <div>
+                <dt>File</dt>
+                <dd>{projectedLap.fileName}</dd>
+              </div>
+              <div>
+                <dt>Lap time</dt>
+                <dd>{formatSeconds(projectedLap.totalLapTimeS)}</dd>
+              </div>
+              <div>
+                <dt>Markers</dt>
+                <dd>{projectedLap.markers.length}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="status-text">{telemetryError ?? "No projected lap loaded."}</p>
+          )}
+          {telemetryError && projectedLap ? <p className="status-text">{telemetryError}</p> : null}
+        </section>
 
         <div className="segmented-group" aria-label="Elevation scale">
           {[1, 2, 3, 5].map((scale) => (
@@ -123,6 +209,12 @@ export function App() {
                 <dt>Length</dt>
                 <dd>{(selectedSection.length_m / 1000).toFixed(3)} km</dd>
               </div>
+              {selectedTelemetrySection && selectedTelemetrySection.sampleCount > 0 ? (
+                <div>
+                  <dt>Actual time</dt>
+                  <dd>{formatSeconds(selectedTelemetrySection.elapsedTimeS)}</dd>
+                </div>
+              ) : null}
             </dl>
           </section>
         ) : null}
@@ -131,4 +223,10 @@ export function App() {
       </aside>
     </main>
   );
+}
+
+function formatSeconds(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds - minutes * 60;
+  return `${minutes}:${remainder.toFixed(3).padStart(6, "0")}`;
 }

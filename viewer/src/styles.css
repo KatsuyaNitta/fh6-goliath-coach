@@ -211,6 +211,13 @@ textarea {
   padding-top: 18px;
 }
 
+.telemetry-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #303946;
+  padding-top: 18px;
+}
+
 .panel-heading h2 {
   margin: 0 0 6px;
   font-size: 18px;
@@ -228,6 +235,51 @@ textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.toggle-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.toggle-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid #34404c;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #20262e;
+  color: #dce4ec;
+  font-size: 13px;
+}
+
+.compact-stats {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  color: #dce4ec;
+  font-size: 13px;
+}
+
+.compact-stats div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.compact-stats dt {
+  color: #8f9ba8;
+}
+
+.compact-stats dd {
+  overflow: hidden;
+  margin: 0;
+  color: #f3f7fb;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hidden-input {
@@ -312,6 +364,13 @@ textarea {
   font-weight: 750;
   text-align: center;
   white-space: nowrap;
+}
+
+.scene-label-dimmed {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(10, 14, 18, 0.42);
+  color: rgba(203, 213, 225, 0.5);
+  opacity: 0.62;
 }
 
 @media (max-width: 860px) {
