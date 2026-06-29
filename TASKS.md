@@ -21,6 +21,10 @@
 
 # 0. Completed Work
 
+## Repository and Viewer
+
+- [x] GitHub repository created.
+- [x] Final repository name is `fh6-goliath-coach`.
 - [x] Build an FH6 UDP telemetry logger.
 - [x] Save telemetry as CSV.
 - [x] Save session metadata as JSON.
@@ -36,14 +40,67 @@
 - [x] Convert markers to reference-course distance.
 - [x] Divide Goliath into six major sections.
 - [x] Create two UI concept images.
+- [x] Full 3D Goliath reference path renders.
+- [x] Confirmed render-coordinate transform is applied.
+- [x] World-Y turntable camera controls are implemented.
+- [x] Camera reset places START side near and mountain side far.
+- [x] S1-S6 selection is implemented.
+- [x] Selected section uses its original color, thicker line, and halo.
+- [x] Non-selected sections are gray and dimmed.
+- [x] Selected section boundary markers are emphasized.
+- [x] Reference and actual telemetry paths use consistent selection emphasis.
+
+## Milestone B1
+
+- [x] Telemetry CSV and session JSON import.
+- [x] UTF-8 BOM handling.
+- [x] Completed-lap extraction.
+- [x] Post-finish sample separation.
+- [x] Five handbrake marker detection.
+- [x] Marker exclusion windows.
+- [x] Continuity-constrained reference-path projection.
+- [x] Loop-bridge incorrect-branch prevention.
+- [x] Course-distance and section assignment.
+- [x] Projection error calculation.
+- [x] Total and S1-S6 section timing.
+- [x] Processed output generation.
+- [x] Projected-lap CSV browser loading.
+- [x] Actual driven-path overlay.
+- [x] Reference/Actual visibility toggles.
+- [x] Total lap time and selected-section time display.
+- [x] Actual P1-P5 marker display.
+- [x] Selected actual-lap segment highlighting.
+- [x] Sanitized fixtures and end-to-end tests.
+
+## Verified B1 Integration Result
+
+- Completed lap: `28:06.859`.
+- Markers: `5`.
+- Mean projection error: `2.015 m`.
+- Median projection error: `1.600 m`.
+- Maximum projection error: `14.795 m`.
+- Uncertain mappings: `0`.
+- Maximum error confirmed as legitimate racing-line/reference-line offset in S4.
+- Section sum differs from lap time by about `0.044 s` because boundary-crossing intervals are not interpolated.
+
+## Current Known Limitations
+
+- Manual lap-selection UI is not implemented.
+- Replay is not implemented.
+- Telemetry charts are not implemented.
+- Driving-quality analysis is not implemented.
+- AI explanations are not implemented.
+- The 2D map view requires a dedicated repair pass.
+- `projected-lap.csv` is approximately 42 MB and should later have a lighter browser-specific representation.
+- Section-boundary timing should later use interpolation.
+- `.gitignore` contains a leading UTF-8 BOM.
+- Previously tracked `backend/fh6_goliath_coach.egg-info/` files must be removed from Git tracking.
 
 ---
-
 # 1. Repository Setup — P0
 
-- [ ] Create GitHub repository.
-- [ ] Choose final repository name.
-  - Suggested: `fh6-goliath-coach`
+- [x] Create GitHub repository.
+- [x] Choose final repository name: `fh6-goliath-coach`.
 - [x] Add `README.md`.
 - [x] Add `CODEX_INSTRUCTIONS.md`.
 - [x] Add `TASKS.md`.
@@ -71,7 +128,6 @@
 - [x] Raw logs are not tracked.
 
 ---
-
 # 2. Reference Course Data — P0
 
 - [x] Add 1 m reference path to `data/reference/`.
@@ -142,51 +198,61 @@
 - [x] Load reference JSON.
 - [x] Render full course as a 3D path.
 - [x] Normalize coordinates around start.
-- [x] Color S1–S6 separately.
-- [x] Render P1–P5.
+- [x] Apply confirmed render-coordinate transform.
+- [x] Color S1-S6 separately.
+- [x] Render P1-P5.
 - [x] Render start/finish.
 - [x] Add OrbitControls.
+- [x] Implement world-Y turntable camera controls.
 - [x] Add camera reset.
+- [x] Camera reset places START side near and mountain side far.
 - [ ] Add fullscreen mode.
 - [x] Add 2D/3D toggle.
 - [x] Add elevation-scale slider.
 - [x] Add grid.
-- [ ] Add direction indicator.
+- [x] Add direction indicator.
 - [x] Add section legend.
 - [x] Add section selection.
 - [x] Highlight selected section.
+- [x] Selected section keeps original color with thicker line and halo.
+- [x] Non-selected sections are gray and dimmed.
+- [x] Selected section boundary markers are emphasized.
+- [x] Reference and actual telemetry paths use consistent selection emphasis.
 - [x] Show section start/end/length.
 - [x] Add loading and error states.
 
 ## Acceptance criteria
 
-- [ ] Entire course renders smoothly.
-- [ ] User can rotate, zoom, and pan.
-- [ ] Six sections are visually distinct.
-- [ ] Five markers are visible.
-- [ ] Elevation scale changes display only.
-- [ ] No invented geometry is presented as factual.
+- [x] Entire course renders smoothly.
+- [x] User can rotate, zoom, and pan.
+- [x] Six sections are visually distinct.
+- [x] Five markers are visible.
+- [x] Elevation scale changes display only.
+- [x] No invented geometry is presented as factual.
 
 ---
-
 # 5. Telemetry Import — P0
 
 - [x] Load telemetry CSV.
 - [x] Inspect and validate headers.
 - [x] Handle UTF-8 BOM.
 - [x] Load session JSON.
-- [ ] Display session metadata.
+- [x] Display session metadata.
 - [x] Detect candidate laps.
 - [ ] Allow manual lap selection.
 - [x] Detect incomplete laps.
+- [x] Extract completed lap.
+- [x] Separate post-finish samples.
+- [x] Detect five handbrake markers.
+- [x] Apply marker exclusion windows.
 - [x] Detect long pauses.
 - [ ] Detect obvious coordinate jumps.
 - [ ] Flag possible rewind segments.
 - [x] Add import error messages.
 - [x] Export normalized session metadata.
+- [x] Generate processed output files.
 
 ---
-
 # 6. Reference-Path Projection — P0
 
 - [ ] Build 3D nearest-neighbor index.
@@ -200,7 +266,15 @@
 - [x] Handle loop-bridge proximity.
 - [x] Flag uncertain matches.
 - [x] Add projection-quality summary.
+- [x] Calculate total lap time.
+- [x] Calculate S1-S6 section timing.
 - [x] Export normalized lap data.
+- [x] Load projected-lap CSV in the browser.
+- [x] Render actual driven-path overlay.
+- [x] Add Reference/Actual visibility toggles.
+- [x] Display total lap time and selected-section time.
+- [x] Display actual P1-P5 markers.
+- [x] Highlight selected actual-lap segment.
 
 ## Tests
 
@@ -209,9 +283,24 @@
 - [ ] Outlier receives warning.
 - [x] Sequence avoids impossible backward jumps.
 - [x] Loop-bridge samples map to correct branch.
+- [x] Sanitized fixtures cover the end-to-end B1 workflow.
 
 ---
 
+# Relative Elevation Visualization — P0
+
+- [ ] Define the canonical reference-path minimum `position_y` as relative height `0 m`.
+- [ ] Preserve original world `position_y`.
+- [ ] Use one fixed reference baseline for all imported laps.
+- [ ] Render a `0 m` base plane.
+- [ ] Draw vertical guides from the base plane to the course.
+- [ ] Show minimum, maximum, start/finish, and total relative-height range.
+- [ ] Label values as relative height above course minimum, not sea-level elevation.
+- [ ] Apply the same baseline to reference and actual paths.
+- [ ] Keep elevation multipliers display-only.
+- [ ] Add baseline and scaling regression tests.
+
+---
 # 7. Lap Replay — P1
 
 - [ ] Add vehicle marker.
@@ -446,15 +535,17 @@ For each corner or analysis zone:
 - [x] Maximum sampling gap.
 - [x] Missing-field report.
 - [x] Projection mean error.
+- [x] Projection median error.
 - [x] Projection maximum error.
+- [x] Uncertain mapping count.
 - [x] Lap completeness.
+- [x] Maximum projection error reviewed and classified.
 - [ ] Coordinate jump detection.
 - [ ] Rewind suspicion.
 - [ ] Course-departure suspicion.
 - [ ] Overall analysis-quality grade.
 
 ---
-
 # 19. Testing — P0/P1
 
 - [x] Coordinate normalization tests.
@@ -464,15 +555,15 @@ For each corner or analysis zone:
 - [x] Marker detection tests.
 - [x] Projection tests.
 - [x] Loop-bridge branch tests.
-- [ ] CSV encoding tests.
+- [x] CSV encoding tests.
 - [x] Missing-column tests.
 - [x] Invalid-value tests.
 - [ ] Large-session performance tests.
 - [x] Viewer smoke test.
+- [x] Telemetry lap loader smoke test.
 - [x] End-to-end sample workflow test.
 
 ---
-
 # 20. Documentation — P0/P1
 
 - [x] README setup instructions.
@@ -483,24 +574,23 @@ For each corner or analysis zone:
 - [x] Section definitions.
 - [ ] Projection algorithm.
 - [ ] Rule-based analysis design.
-- [ ] Data-quality interpretation.
+- [x] Data-quality interpretation.
 - [x] Known limitations.
 - [x] Raw-log and privacy handling.
 
 ---
-
 # Next 10 Tasks
 
-1. [ ] Create GitHub repository.
-2. [ ] Commit `CODEX_INSTRUCTIONS.md` and `TASKS.md`.
-3. [x] Add reference path and section configuration.
-4. [x] Initialize Python package.
-5. [x] Initialize Vite + React + TypeScript viewer.
-6. [x] Render the 3D reference path.
-7. [x] Color S1–S6.
-8. [x] Render P1–P5 and start/finish.
-9. [x] Add elevation-scale control.
-10. [x] Add tests for coordinate normalization and section assignment.
+1. [ ] Remove the `.gitignore` BOM and stop tracking generated `*.egg-info/`.
+2. [ ] Implement relative elevation above the canonical course minimum.
+3. [ ] Add the `0 m` plane and vertical height guides.
+4. [ ] Add relative-height labels and range summary.
+5. [ ] Add relative-elevation tests.
+6. [ ] Produce a lightweight browser-specific lap dataset.
+7. [ ] Interpolate section-boundary crossing times.
+8. [ ] Repair and separate the 2D orthographic map view.
+9. [ ] Add the first synchronized telemetry chart, starting with speed.
+10. [ ] Begin Milestone C with a vehicle marker and basic replay controls.
 
 ---
 
@@ -508,14 +598,15 @@ For each corner or analysis zone:
 
 The MVP is complete when:
 
-- [ ] The browser renders the full 3D Goliath reference path.
-- [ ] S1–S6 are color-coded.
-- [ ] P1–P5 and start/finish are visible.
-- [ ] Elevation scale is adjustable.
-- [ ] A telemetry CSV can be loaded.
-- [ ] A selected lap can be projected to the reference path.
+- [x] The browser renders the full 3D Goliath reference path.
+- [x] S1-S6 are color-coded and selectable.
+- [x] P1-P5 and start/finish are visible.
+- [x] Elevation scale is adjustable.
+- [x] Telemetry import and normalization are implemented.
+- [x] A completed lap can be projected to the reference path.
+- [x] Static actual-path and section-time inspection are implemented.
+- [x] The application works without an external AI API.
+- [ ] Relative-height visualization is implemented.
 - [ ] The lap can be replayed in 3D.
-- [ ] At least three rule-based issues are detected.
-- [ ] Each issue is shown with evidence and a recommendation.
-- [ ] The application works without an external AI API.
-
+- [ ] Rule-based issue detection is implemented.
+- [ ] Evidence-backed recommendations are shown.
