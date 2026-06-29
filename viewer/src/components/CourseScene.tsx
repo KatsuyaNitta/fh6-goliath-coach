@@ -1,9 +1,14 @@
 import { Canvas } from "@react-three/fiber";
-import { Grid, Html, Line, OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { useMemo } from "react";
+import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from "@react-three/drei";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
-import { POINT, SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
+import { SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
+import {
+  referencePointToRenderVector,
+  referencePointsToRenderBounds,
+  type RenderBounds,
+} from "../lib/renderCoordinates";
 
 interface CourseSceneProps {
   reference: ReferencePayload;
@@ -19,23 +24,27 @@ export function CourseScene({
   viewMode,
 }: CourseSceneProps) {
   const bounds = useMemo(
-    () => getBounds(reference.points, elevationScale),
+    () => referencePointsToRenderBounds(reference.points, elevationScale),
     [reference.points, elevationScale],
   );
   const cameraPosition: [number, number, number] =
     viewMode === "2d"
-      ? [bounds.center[0], bounds.size * 1.35, bounds.center[2] + 0.01]
-      : [bounds.center[0] - bounds.size * 0.45, bounds.size * 0.42, bounds.center[2] + bounds.size * 0.62];
+      ? [bounds.center[0], bounds.center[1] + bounds.size * 1.35, bounds.center[2]]
+      : [
+          bounds.center[0] - bounds.size * 0.45,
+          bounds.center[1] + bounds.size * 0.42,
+          bounds.center[2] + bounds.size * 0.62,
+        ];
 
   return (
     <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
       <color attach="background" args={["#101318"]} />
-      <PerspectiveCamera makeDefault position={cameraPosition} near={1} far={200000} fov={45} />
+      <SceneCamera bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
       <ambientLight intensity={0.85} />
       <directionalLight position={[2500, 5000, 2500]} intensity={1.4} />
       <Grid
         args={[90000, 24]}
-        position={[bounds.center[0], -40, bounds.center[2]]}
+        position={[bounds.center[0], bounds.center[1] - 40, bounds.center[2]]}
         cellColor="#2b323b"
         sectionColor="#46515d"
         fadeDistance={90000}
@@ -54,6 +63,61 @@ export function CourseScene({
         minDistance={1500}
       />
     </Canvas>
+  );
+}
+
+function SceneCamera({
+  bounds,
+  cameraPosition,
+  viewMode,
+}: {
+  bounds: RenderBounds;
+  cameraPosition: [number, number, number];
+  viewMode: "2d" | "3d";
+}) {
+  const topDownRef = useRef<THREE.OrthographicCamera | null>(null);
+  const perspectiveRef = useRef<THREE.PerspectiveCamera | null>(null);
+
+  useEffect(() => {
+    const camera = viewMode === "2d" ? topDownRef.current : perspectiveRef.current;
+    if (!camera) {
+      return;
+    }
+    if (viewMode === "2d") {
+      camera.up.set(0, 0, -1);
+    } else {
+      camera.up.set(0, 1, 0);
+    }
+    camera.lookAt(...bounds.center);
+    camera.updateProjectionMatrix();
+  }, [bounds.center, viewMode]);
+
+  if (viewMode === "2d") {
+    const halfSize = bounds.size * 0.55;
+    return (
+      <OrthographicCamera
+        ref={topDownRef}
+        makeDefault
+        position={cameraPosition}
+        left={-halfSize}
+        right={halfSize}
+        top={halfSize}
+        bottom={-halfSize}
+        near={1}
+        far={200000}
+      />
+    );
+  }
+
+  return (
+    <PerspectiveCamera
+      ref={perspectiveRef}
+      makeDefault
+      position={cameraPosition}
+      near={1}
+      far={200000}
+      fov={45}
+    />
   );
 }
 
@@ -96,7 +160,7 @@ function CourseLines({
         return (
           <Line
             key={section.id}
-            points={points.map((point) => toVector(point, elevationScale))}
+            points={points.map((point) => referencePointToRenderVector(point, elevationScale))}
             color={SECTION_COLORS[section.id]}
             lineWidth={section.id === selectedSectionId ? 7 : 3}
             transparent
@@ -130,7 +194,7 @@ function Marker({
   point: ReferencePointTuple;
   elevationScale: number;
 }) {
-  const position = toVector(point, elevationScale);
+  const position = referencePointToRenderVector(point, elevationScale);
   return (
     <group position={position}>
       <mesh>
@@ -142,33 +206,4 @@ function Marker({
       </Html>
     </group>
   );
-}
-
-function toVector(point: ReferencePointTuple, elevationScale: number): [number, number, number] {
-  return [
-    point[POINT.displayX],
-    point[POINT.displayY] * elevationScale,
-    point[POINT.displayZ],
-  ];
-}
-
-function getBounds(points: ReferencePointTuple[], elevationScale: number) {
-  const box = new THREE.Box3();
-  for (const point of points) {
-    box.expandByPoint(
-      new THREE.Vector3(
-        point[POINT.displayX],
-        point[POINT.displayY] * elevationScale,
-        point[POINT.displayZ],
-      ),
-    );
-  }
-  const center = new THREE.Vector3();
-  const size = new THREE.Vector3();
-  box.getCenter(center);
-  box.getSize(size);
-  return {
-    center: [center.x, center.y, center.z] as [number, number, number],
-    size: Math.max(size.x, size.y, size.z),
-  };
 }
