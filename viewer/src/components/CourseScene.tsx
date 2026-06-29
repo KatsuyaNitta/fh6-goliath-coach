@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ElementRef } from "react";
 import * as THREE from "three";
 import type { ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
 import { SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
@@ -9,6 +9,7 @@ import {
   referencePointsToRenderBounds,
   type RenderBounds,
 } from "../lib/renderCoordinates";
+import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCameraPosition } from "../lib/cameraFraming";
 
 interface CourseSceneProps {
   reference: ReferencePayload;
@@ -28,18 +29,16 @@ export function CourseScene({
     [reference.points, elevationScale],
   );
   const cameraPosition: [number, number, number] =
-    viewMode === "2d"
-      ? [bounds.center[0], bounds.center[1] + bounds.size * 1.35, bounds.center[2]]
-      : [
-          bounds.center[0] - bounds.size * 0.45,
-          bounds.center[1] + bounds.size * 0.42,
-          bounds.center[2] + bounds.size * 0.62,
-        ];
+    viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds);
 
   return (
     <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
       <color attach="background" args={["#101318"]} />
-      <SceneCamera bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
+      <SceneCamera
+        bounds={bounds}
+        cameraPosition={cameraPosition}
+        viewMode={viewMode}
+      />
       <ambientLight intensity={0.85} />
       <directionalLight position={[2500, 5000, 2500]} intensity={1.4} />
       <Grid
@@ -54,14 +53,7 @@ export function CourseScene({
         elevationScale={elevationScale}
         selectedSectionId={selectedSectionId}
       />
-      <OrbitControls
-        enableRotate={viewMode === "3d"}
-        enablePan
-        enableZoom
-        target={bounds.center}
-        maxDistance={100000}
-        minDistance={1500}
-      />
+      <SceneControls bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
     </Canvas>
   );
 }
@@ -83,14 +75,10 @@ function SceneCamera({
     if (!camera) {
       return;
     }
-    if (viewMode === "2d") {
-      camera.up.set(0, 0, -1);
-    } else {
-      camera.up.set(0, 1, 0);
-    }
-    camera.lookAt(...bounds.center);
+    applyCameraPose(camera, cameraPosition, bounds.center, viewMode);
     camera.updateProjectionMatrix();
-  }, [bounds.center, viewMode]);
+    camera.updateMatrixWorld(true);
+  }, [bounds.center, cameraPosition, viewMode]);
 
   if (viewMode === "2d") {
     const halfSize = bounds.size * 0.55;
@@ -99,6 +87,7 @@ function SceneCamera({
         ref={topDownRef}
         makeDefault
         position={cameraPosition}
+        up={[0, 0, -1]}
         left={-halfSize}
         right={halfSize}
         top={halfSize}
@@ -114,11 +103,57 @@ function SceneCamera({
       ref={perspectiveRef}
       makeDefault
       position={cameraPosition}
+      up={[0, 1, 0]}
       near={1}
       far={200000}
       fov={45}
     />
   );
+}
+
+function SceneControls({
+  bounds,
+  cameraPosition,
+  viewMode,
+}: {
+  bounds: RenderBounds;
+  cameraPosition: [number, number, number];
+  viewMode: "2d" | "3d";
+}) {
+  const controlsRef = useRef<ElementRef<typeof OrbitControls> | null>(null);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) {
+      return;
+    }
+    applyCameraPose(controls.object, cameraPosition, bounds.center, viewMode);
+    controls.target.set(...bounds.center);
+    controls.update();
+  }, [bounds.center, cameraPosition, viewMode]);
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enableRotate={viewMode === "3d"}
+      enablePan
+      enableZoom
+      target={bounds.center}
+      maxDistance={100000}
+      minDistance={1500}
+    />
+  );
+}
+
+function applyCameraPose(
+  camera: THREE.Camera,
+  position: [number, number, number],
+  target: [number, number, number],
+  viewMode: "2d" | "3d",
+) {
+  camera.position.set(...position);
+  camera.up.set(...getCameraUpVector(position, target, viewMode));
+  camera.lookAt(...target);
 }
 
 function CourseLines({

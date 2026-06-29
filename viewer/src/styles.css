@@ -36,6 +36,22 @@ textarea {
   background: #101318;
 }
 
+.orientation-indicator {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(12, 16, 22, 0.78);
+  color: #e8eef5;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .load-state {
   display: grid;
   min-height: 100vh;

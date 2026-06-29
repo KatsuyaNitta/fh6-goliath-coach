@@ -33,13 +33,19 @@ export function App() {
     <main className="app-shell">
       <section className="viewer-surface">
         {reference ? (
-          <CourseScene
-            key={`${viewMode}-${cameraResetKey}`}
-            reference={reference}
-            elevationScale={elevationScale}
-            selectedSectionId={selectedSectionId}
-            viewMode={viewMode}
-          />
+          <>
+            <CourseScene
+              key={`${viewMode}-${cameraResetKey}`}
+              reference={reference}
+              elevationScale={elevationScale}
+              selectedSectionId={selectedSectionId}
+              viewMode={viewMode}
+            />
+            <div className="orientation-indicator" aria-label="Map orientation">
+              <span>+X -&gt; right</span>
+              <span>+Z -&gt; map up</span>
+            </div>
+          </>
         ) : (
           <div className="load-state">{error ?? "Loading Goliath reference path..."}</div>
         )}
