@@ -1,0 +1,29 @@
+[project]
+name = "fh6-goliath-coach"
+version = "0.1.0"
+description = "Goliath-specific telemetry analysis and 3D reference-path viewer for Forza Horizon 6."
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+goliath = "goliath.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "backend"}
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
