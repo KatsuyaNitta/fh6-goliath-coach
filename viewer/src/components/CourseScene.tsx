@@ -139,6 +139,8 @@ function SceneControls({
       enablePan
       enableZoom
       target={bounds.center}
+      minPolarAngle={viewMode === "3d" ? 0.15 : 0}
+      maxPolarAngle={viewMode === "3d" ? Math.PI / 2 - 0.03 : Math.PI}
       maxDistance={100000}
       minDistance={1500}
     />
@@ -152,7 +154,7 @@ function applyCameraPose(
   viewMode: "2d" | "3d",
 ) {
   camera.position.set(...position);
-  camera.up.set(...getCameraUpVector(position, target, viewMode));
+  camera.up.set(...getCameraUpVector(viewMode));
   camera.lookAt(...target);
 }
 

@@ -62,51 +62,35 @@ const cameraPosition = getCanonical3DAnalysisCameraPosition(bounds);
 assert.equal(cameraPosition[0], bounds.center[0]);
 assert.ok(cameraPosition[2] > bounds.center[2], "3D camera must be on positive render-Z side");
 assert.ok(
-  cameraPosition[1] - bounds.center[1] > cameraPosition[2] - bounds.center[2],
-  "3D reset camera should be height-dominant so flattened orientation matches the reference map",
+  cameraPosition[2] - bounds.center[2] > cameraPosition[1] - bounds.center[1],
+  "3D reset camera should use a low oblique turntable view",
 );
 
 const camera = new THREE.PerspectiveCamera(45, 16 / 9, 1, 200000);
 camera.position.set(...cameraPosition);
-camera.up.set(...getCameraUpVector(cameraPosition, bounds.center, "3d"));
+camera.up.set(...getCameraUpVector("3d"));
 camera.lookAt(...bounds.center);
 camera.updateProjectionMatrix();
 camera.updateMatrixWorld(true);
 
-const centerLineLeft = new THREE.Vector3(
-  bounds.center[0] - bounds.size * 0.25,
-  bounds.center[1] - 40,
-  bounds.center[2],
-).project(camera);
-const centerLineRight = new THREE.Vector3(
-  bounds.center[0] + bounds.size * 0.25,
-  bounds.center[1] - 40,
-  bounds.center[2],
-).project(camera);
-const projectedCenter = new THREE.Vector3(
-  bounds.center[0],
-  bounds.center[1] - 40,
-  bounds.center[2],
-).project(camera);
-const mapUpProbe = new THREE.Vector3(
-  bounds.center[0],
-  bounds.center[1] - 40,
-  bounds.center[2] - bounds.size * 0.25,
-).project(camera);
-
 const start = renderPoint(payload.points[0]).project(camera);
+const finish = renderPoint(payload.points.at(-1)).project(camera);
 const p2 = renderPoint(nearestPoint(31659.142)).project(camera);
-const p4 = renderPoint(nearestPoint(60737.384)).project(camera);
+const p3 = renderPoint(nearestPoint(42581.232)).project(camera);
 
-assert.ok(
-  Math.abs(centerLineLeft.y - centerLineRight.y) < 1e-6,
-  "Reset camera should project the center X reference line horizontally",
-);
-assert.ok(mapUpProbe.y > projectedCenter.y, "Original positive Z should project upward on screen");
-assert.ok(start.x > 0, "START / FINISH should project to the right side");
-assert.ok(start.y < 0, "START / FINISH should project to the lower area");
-assert.ok(p2.y > 0, "P2 should project to the upper area");
-assert.ok(p4.x < 0, "P4 should project to the left side");
-assert.ok(p4.y < 0, "P4 should project to the lower-left area");
+function cameraDepth(point) {
+  return renderPoint(point).applyMatrix4(camera.matrixWorldInverse).z;
+}
+
+const startDepth = cameraDepth(payload.points[0]);
+const finishDepth = cameraDepth(payload.points.at(-1));
+const p2Depth = cameraDepth(nearestPoint(31659.142));
+const p3Depth = cameraDepth(nearestPoint(42581.232));
+
+assert.deepEqual(getCameraUpVector("3d"), [0, 1, 0], "3D camera up must stay on world Y");
+assert.ok(startDepth > p2Depth, "START should be closer than the S2 summit side");
+assert.ok(finishDepth > p3Depth, "FINISH should be closer than the S3 summit side");
+assert.ok(start.y < p2.y, "START should project nearer the foreground than P2");
+assert.ok(finish.y < p3.y, "FINISH should project nearer the foreground than P3");
 
 console.log("camera orientation smoke test passed");
