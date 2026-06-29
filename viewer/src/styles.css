@@ -18,7 +18,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -71,6 +73,8 @@ input {
 }
 
 .control-row button,
+.segmented-group button,
+.command-button,
 .section-button {
   border: 1px solid #34404c;
   border-radius: 8px;
@@ -79,14 +83,27 @@ input {
   cursor: pointer;
 }
 
-.control-row button {
+.control-row button,
+.segmented-group button,
+.command-button {
   min-height: 40px;
 }
 
 .control-row button.active,
+.segmented-group button.active,
 .section-button.selected {
   border-color: #66d9e8;
   background: #26313a;
+}
+
+.command-button {
+  width: 100%;
+}
+
+.segmented-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
 .slider-row {
@@ -169,6 +186,102 @@ input {
 .section-detail dd {
   margin: 0;
   color: #f3f7fb;
+}
+
+.metadata-panel {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #303946;
+  padding-top: 18px;
+}
+
+.panel-heading h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.panel-heading p,
+.status-text {
+  margin: 0;
+  color: #aeb8c3;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.metadata-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.form-section {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid #2c3541;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.form-section legend {
+  padding: 0 4px;
+  color: #e7eef6;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 8px;
+  color: #cfd8e3;
+  font-size: 13px;
+}
+
+.field-row input,
+.field-row select,
+.field-row textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #34404c;
+  border-radius: 6px;
+  background: #11161c;
+  color: #eef2f7;
+}
+
+.field-row input,
+.field-row select {
+  min-height: 34px;
+  padding: 0 8px;
+}
+
+.field-row textarea {
+  min-height: 68px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.field-row-wide {
+  grid-template-columns: 1fr;
+}
+
+.numeric-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 6px;
+}
+
+.numeric-input em {
+  color: #9ca8b5;
+  font-size: 12px;
+  font-style: normal;
+  text-align: left;
 }
 
 .scene-label {

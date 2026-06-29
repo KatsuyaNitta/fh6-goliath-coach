@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReferencePayload, SectionDefinition, SectionId } from "./lib/reference";
 import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
+import { VehicleTunePanel } from "./components/VehicleTunePanel";
 
 type ViewMode = "3d" | "2d";
 
@@ -9,8 +10,9 @@ export function App() {
   const [reference, setReference] = useState<ReferencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<SectionId>("S1");
-  const [elevationScale, setElevationScale] = useState(8);
+  const [elevationScale, setElevationScale] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
+  const [cameraResetKey, setCameraResetKey] = useState(0);
 
   useEffect(() => {
     fetchReference()
@@ -32,6 +34,7 @@ export function App() {
       <section className="viewer-surface">
         {reference ? (
           <CourseScene
+            key={`${viewMode}-${cameraResetKey}`}
             reference={reference}
             elevationScale={elevationScale}
             selectedSectionId={selectedSectionId}
@@ -65,18 +68,22 @@ export function App() {
           </button>
         </div>
 
-        <label className="slider-row">
-          <span>Elevation scale</span>
-          <strong>{elevationScale.toFixed(1)}x</strong>
-          <input
-            type="range"
-            min="0"
-            max="20"
-            step="0.5"
-            value={elevationScale}
-            onChange={(event) => setElevationScale(Number(event.target.value))}
-          />
-        </label>
+        <button className="command-button" type="button" onClick={() => setCameraResetKey((key) => key + 1)}>
+          Reset camera
+        </button>
+
+        <div className="segmented-group" aria-label="Elevation scale">
+          {[1, 2, 3, 5].map((scale) => (
+            <button
+              className={elevationScale === scale ? "active" : ""}
+              key={scale}
+              type="button"
+              onClick={() => setElevationScale(scale)}
+            >
+              {scale}x
+            </button>
+          ))}
+        </div>
 
         <div className="section-list" aria-label="Sections">
           {reference?.sections.map((section) => (
@@ -113,6 +120,8 @@ export function App() {
             </dl>
           </section>
         ) : null}
+
+        <VehicleTunePanel />
       </aside>
     </main>
   );

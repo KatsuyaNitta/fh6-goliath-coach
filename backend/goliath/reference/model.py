@@ -16,6 +16,7 @@ class ReferencePoint:
     display_y: float
     display_z: float
     section_id: str
+    section_index: int
 
 
 @dataclass(frozen=True)

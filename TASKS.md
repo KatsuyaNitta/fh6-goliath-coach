@@ -49,7 +49,7 @@
 - [x] Add `TASKS.md`.
 - [ ] Add license.
 - [x] Add `.gitignore`.
-- [ ] Ignore raw telemetry logs.
+- [x] Ignore raw telemetry logs.
 - [ ] Add small sanitized sample data.
 - [x] Create Python project configuration.
 - [x] Create frontend project configuration.
@@ -61,14 +61,14 @@
 - [ ] Add ESLint.
 - [ ] Add Prettier.
 - [ ] Add GitHub Actions CI.
-- [ ] Add documented backend and frontend test commands.
+- [x] Add documented backend and frontend test commands.
 
 ## Acceptance criteria
 
 - [ ] Fresh clone can install dependencies.
-- [ ] Backend tests run with one command.
-- [ ] Frontend tests run with one command.
-- [ ] Raw logs are not tracked.
+- [x] Backend tests run with one command.
+- [x] Frontend tests run with one command.
+- [x] Raw logs are not tracked.
 
 ---
 
@@ -82,9 +82,9 @@
 - [x] Document coordinate axes.
 - [x] Validate monotonic course distance.
 - [x] Validate total length near 84.677 km.
-- [ ] Validate boundary ordering.
-- [ ] Validate no section gaps.
-- [ ] Validate no section overlap.
+- [x] Validate boundary ordering.
+- [x] Validate no section gaps.
+- [x] Validate no section overlap.
 - [x] Export browser-friendly JSON.
 - [x] Add schema version.
 - [x] Add provenance metadata.
@@ -102,10 +102,10 @@
 
 ## Acceptance criteria
 
-- [ ] Parser loads the reference path.
-- [ ] Every reference point receives one section ID.
-- [ ] Start and finish are valid.
-- [ ] P1–P5 render at the correct distances.
+- [x] Parser loads the reference path.
+- [x] Every reference point receives one section ID.
+- [x] Start and finish are valid.
+- [x] P1–P5 render at the correct distances.
 
 ---
 
@@ -146,11 +146,11 @@
 - [x] Render P1–P5.
 - [x] Render start/finish.
 - [x] Add OrbitControls.
-- [ ] Add camera reset.
+- [x] Add camera reset.
 - [ ] Add fullscreen mode.
 - [x] Add 2D/3D toggle.
 - [x] Add elevation-scale slider.
-- [ ] Add grid.
+- [x] Add grid.
 - [ ] Add direction indicator.
 - [x] Add section legend.
 - [x] Add section selection.
@@ -377,13 +377,13 @@ For each corner or analysis zone:
 # 15. Car Comparison — P2
 
 - [ ] Compare Porsche 911 GT3 and Lamborghini Essenza SCV12.
-- [ ] Store car identity.
-- [ ] Store drivetrain.
-- [ ] Store PI.
-- [ ] Store power.
-- [ ] Store weight.
+- [x] Store car identity.
+- [x] Store drivetrain.
+- [x] Store PI.
+- [x] Store power.
+- [x] Store weight.
 - [ ] Store tire type.
-- [ ] Store setup metadata.
+- [x] Store setup metadata.
 - [ ] Compare uphill performance.
 - [ ] Compare downhill stability.
 - [ ] Compare high-speed corner behavior.
@@ -396,22 +396,22 @@ For each corner or analysis zone:
 
 # 16. Setup Data — P3
 
-- [ ] Tire pressures.
-- [ ] Gear ratios.
-- [ ] Final drive.
-- [ ] Camber.
-- [ ] Toe.
-- [ ] Caster.
-- [ ] Anti-roll bars.
-- [ ] Springs.
-- [ ] Ride height.
-- [ ] Damping.
-- [ ] Aero.
-- [ ] Brake balance.
-- [ ] Brake pressure.
-- [ ] Differential settings.
-- [ ] AWD torque split where applicable.
-- [ ] Setup versioning.
+- [x] Tire pressures.
+- [x] Gear ratios.
+- [x] Final drive.
+- [x] Camber.
+- [x] Toe.
+- [x] Caster.
+- [x] Anti-roll bars.
+- [x] Springs.
+- [x] Ride height.
+- [x] Damping.
+- [x] Aero.
+- [x] Brake balance.
+- [x] Brake pressure.
+- [x] Differential settings.
+- [x] AWD torque split where applicable.
+- [x] Setup versioning.
 - [ ] Before/after comparison.
 
 ---
@@ -465,26 +465,26 @@ For each corner or analysis zone:
 - [ ] Projection tests.
 - [ ] Loop-bridge branch tests.
 - [ ] CSV encoding tests.
-- [ ] Missing-column tests.
-- [ ] Invalid-value tests.
+- [x] Missing-column tests.
+- [x] Invalid-value tests.
 - [ ] Large-session performance tests.
-- [ ] Viewer smoke test.
+- [x] Viewer smoke test.
 - [ ] End-to-end sample workflow test.
 
 ---
 
 # 20. Documentation — P0/P1
 
-- [ ] README setup instructions.
+- [x] README setup instructions.
 - [ ] Architecture overview.
 - [ ] Telemetry field documentation.
-- [ ] Coordinate-system documentation.
-- [ ] Reference-path limitations.
-- [ ] Section definitions.
+- [x] Coordinate-system documentation.
+- [x] Reference-path limitations.
+- [x] Section definitions.
 - [ ] Projection algorithm.
 - [ ] Rule-based analysis design.
 - [ ] Data-quality interpretation.
-- [ ] Known limitations.
+- [x] Known limitations.
 - [ ] Raw-log and privacy handling.
 
 ---

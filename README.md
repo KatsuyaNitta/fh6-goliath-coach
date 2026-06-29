@@ -1,21 +1,23 @@
 # FH6 Goliath Coach
 
-Browser-based telemetry analysis and 3D reference-path visualization for the Goliath course in Forza Horizon 6.
+Browser-based reference-path visualization for the Goliath course in Forza Horizon 6.
 
-The first milestone focuses on rendering the confirmed 1 m sampled Goliath driving path. This path is not a verified road centerline and does not contain road width, road edges, checkpoints, guardrails, curbs, or collision geometry.
+This milestone renders the confirmed 1 m sampled Goliath driving path. The path is not an official road centerline, not an ideal racing line, and not complete road geometry. The viewer renders a line only; it does not invent road width, road edges, curbs, guardrails, checkpoints, or terrain.
 
-## Current Vertical Slice
+## Current Milestone A Slice
 
 - Load `data/reference/goliath_reference_1m.csv`.
+- Validate required columns, finite numeric values, and strictly increasing `course_distance_m`.
 - Preserve original `position_x`, `position_y`, and `position_z`.
-- Add display coordinates normalized around the start point.
+- Export display coordinates normalized around the first point.
 - Assign S1-S6 using the confirmed boundary distances.
-- Export `viewer/public/reference/goliath_reference.json`.
-- Render the full sampled driving path in a Vite + React + Three.js viewer.
+- Export compact browser data to `viewer/public/reference/goliath_reference.json`.
+- Render the sampled driving path in a Vite + React + TypeScript + React Three Fiber viewer.
+- Capture minimal vehicle metadata and Forza-ordered tune values, with JSON save/load.
 
-## Reference Data
+## Reference CSV
 
-Expected source file:
+Source file:
 
 ```text
 data/reference/goliath_reference_1m.csv
@@ -33,7 +35,7 @@ Coordinate interpretation:
 - `position_z`: horizontal world axis
 - `position_y`: height/elevation
 
-Display coordinates are normalized around the start:
+Display coordinates:
 
 ```text
 display_x = position_x - start_x
@@ -41,28 +43,82 @@ display_y = position_y - start_y
 display_z = position_z - start_z
 ```
 
-## Build Reference JSON
+## Section Boundaries
+
+| Section | Start m | End m |
+|---|---:|---:|
+| S1 | 0.000 | 17,630.242 |
+| S2 | 17,630.242 | 31,659.142 |
+| S3 | 31,659.142 | 42,581.232 |
+| S4 | 42,581.232 | 60,737.384 |
+| S5 | 60,737.384 | 74,188.316 |
+| S6 | 74,188.316 | reference finish |
+
+## Python Setup
+
+From the repository root in Windows PowerShell:
 
 ```powershell
-$env:PYTHONPATH="$PWD\backend"
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+## Generate Viewer Data
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 python -m goliath.cli build-reference data\reference\goliath_reference_1m.csv --output viewer\public\reference\goliath_reference.json
 ```
 
 ## Backend Tests
 
 ```powershell
-$env:PYTHONPATH="$PWD\backend"
+.\.venv\Scripts\Activate.ps1
 python -m unittest discover -s tests
 ```
 
-## Viewer
-
-Install frontend dependencies, then run:
+## Frontend Setup
 
 ```powershell
 cd viewer
-npm install
-npm run dev
+corepack enable
+corepack pnpm install
 ```
 
-Open the printed local URL. The viewer loads `/reference/goliath_reference.json`.
+If `pnpm` is already installed:
+
+```powershell
+cd viewer
+pnpm install
+```
+
+## Start Development Server
+
+```powershell
+cd viewer
+pnpm run dev
+```
+
+Open the local URL printed by Vite. The app loads:
+
+```text
+/reference/goliath_reference.json
+```
+
+## Frontend Tests
+
+```powershell
+cd viewer
+pnpm run test
+```
+
+The frontend smoke test checks generated reference data and the vehicle/tune metadata design constraints.
+
+## Production Build
+
+```powershell
+cd viewer
+pnpm run build
+```

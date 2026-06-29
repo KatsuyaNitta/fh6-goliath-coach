@@ -2,8 +2,8 @@ import { Canvas } from "@react-three/fiber";
 import { Grid, Html, Line, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
-import type { ReferencePayload, ReferencePoint, SectionId } from "../lib/reference";
-import { SECTION_COLORS, nearestPointByDistance } from "../lib/reference";
+import type { ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
+import { POINT, SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
 
 interface CourseSceneProps {
   reference: ReferencePayload;
@@ -18,7 +18,10 @@ export function CourseScene({
   selectedSectionId,
   viewMode,
 }: CourseSceneProps) {
-  const bounds = useMemo(() => getBounds(reference.points, elevationScale), [reference.points, elevationScale]);
+  const bounds = useMemo(
+    () => getBounds(reference.points, elevationScale),
+    [reference.points, elevationScale],
+  );
   const cameraPosition: [number, number, number] =
     viewMode === "2d"
       ? [bounds.center[0], bounds.size * 1.35, bounds.center[2] + 0.01]
@@ -44,6 +47,8 @@ export function CourseScene({
       />
       <OrbitControls
         enableRotate={viewMode === "3d"}
+        enablePan
+        enableZoom
         target={bounds.center}
         maxDistance={100000}
         minDistance={1500}
@@ -62,14 +67,15 @@ function CourseLines({
   selectedSectionId: SectionId;
 }) {
   const sectionPoints = useMemo(() => {
-    const grouped = new Map<SectionId, ReferencePoint[]>();
+    const grouped = new Map<SectionId, ReferencePointTuple[]>();
     for (const point of reference.points) {
-      const points = grouped.get(point.section_id) ?? [];
+      const id = pointSectionId(reference, point);
+      const points = grouped.get(id) ?? [];
       points.push(point);
-      grouped.set(point.section_id, points);
+      grouped.set(id, points);
     }
     return grouped;
-  }, [reference.points]);
+  }, [reference]);
 
   const markerPoints = useMemo(() => {
     return reference.markers
@@ -77,7 +83,7 @@ function CourseLines({
         marker,
         point: nearestPointByDistance(reference.points, marker.course_distance_m),
       }))
-      .filter((item): item is typeof item & { point: ReferencePoint } => Boolean(item.point));
+      .filter((item): item is typeof item & { point: ReferencePointTuple } => Boolean(item.point));
   }, [reference.markers, reference.points]);
 
   const startPoint = reference.points[0];
@@ -121,7 +127,7 @@ function Marker({
 }: {
   color: string;
   label: string;
-  point: ReferencePoint;
+  point: ReferencePointTuple;
   elevationScale: number;
 }) {
   const position = toVector(point, elevationScale);
@@ -138,14 +144,24 @@ function Marker({
   );
 }
 
-function toVector(point: ReferencePoint, elevationScale: number): [number, number, number] {
-  return [point.display_x, point.display_y * elevationScale, point.display_z];
+function toVector(point: ReferencePointTuple, elevationScale: number): [number, number, number] {
+  return [
+    point[POINT.displayX],
+    point[POINT.displayY] * elevationScale,
+    point[POINT.displayZ],
+  ];
 }
 
-function getBounds(points: ReferencePoint[], elevationScale: number) {
+function getBounds(points: ReferencePointTuple[], elevationScale: number) {
   const box = new THREE.Box3();
   for (const point of points) {
-    box.expandByPoint(new THREE.Vector3(point.display_x, point.display_y * elevationScale, point.display_z));
+    box.expandByPoint(
+      new THREE.Vector3(
+        point[POINT.displayX],
+        point[POINT.displayY] * elevationScale,
+        point[POINT.displayZ],
+      ),
+    );
   }
   const center = new THREE.Vector3();
   const size = new THREE.Vector3();
