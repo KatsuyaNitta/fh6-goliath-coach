@@ -1,22 +1,75 @@
 # FH6 Goliath Coach
 
-Browser-based reference-path visualization for the Goliath course in Forza Horizon 6.
+## 日本語
 
-This milestone renders the confirmed 1 m sampled Goliath driving path. The path is not an official road centerline, not an ideal racing line, and not complete road geometry. The viewer renders a line only; it does not invent road width, road edges, curbs, guardrails, checkpoints, or terrain.
+FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済みテレメトリと 3D コースビューで分析するためのツールです。
 
-## Current Milestone Slice
+現時点では、完成済みのドライビングコーチではありません。まずは、基準走行パスと実走行データを同じコース距離上に重ね、区間ごとのタイムや走行ラインの違いを確認できる分析ビューアとして実装しています。
 
-- Load `data/reference/goliath_reference_1m.csv`.
-- Validate required columns, finite numeric values, and strictly increasing `course_distance_m`.
-- Preserve original `position_x`, `position_y`, and `position_z`.
-- Export display coordinates normalized around the first point.
-- Assign S1-S6 using the confirmed boundary distances.
-- Export compact browser data to `viewer/public/reference/goliath_reference.json`.
-- Render the sampled driving path in a Vite + React + TypeScript + React Three Fiber viewer.
-- Capture minimal vehicle metadata and Forza-ordered tune values, with JSON save/load.
-- Import one processed Goliath telemetry session from local CSV/JSON files.
-- Extract the completed lap, detect five handbrake section markers, and project the lap onto the reference path.
-- Load a processed `projected-lap.csv` in the viewer and overlay the actual driven path.
+### 現在の実装状況
+
+現在の実装には次の機能が含まれます。
+
+- Goliath の 1 m 間隔の基準走行パスの 3D 表示
+- S1-S6 の 6 区間表示
+- P1-P5 の区間境界マーカー
+- 3D 視点の回転、ズーム、パン
+- 2D/3D 表示切り替え
+- 高さ倍率の変更
+- 実走行テレメトリ CSV とセッション JSON の処理
+- 完走ラップの抽出
+- 5 個の手動ハンドブレーキマーカーの検出
+- 実走行データの基準パスへの投影
+- 実走行ラインと基準ラインの重ね合わせ
+- 総合タイムと S1-S6 区間タイム
+- 選択区間の強調と非選択区間のグレーアウト
+- 車両情報と Forza 順のチューニング値の保存、読み込み
+
+Milestone B1 は完了しています。
+
+検証済みの統合結果:
+
+- Completed lap: `28:06.859`
+- Detected markers: `5`
+- Mean projection error: `2.015 m`
+- Median projection error: `1.600 m`
+- Maximum projection error: `14.795 m`
+- Uncertain mappings: `0`
+
+最大投影誤差は S4 で発生しており、誤った分岐へのマッチではなく、実際の走行ラインと基準パスの正当なオフセットとして確認済みです。
+
+S1-S6 の区間タイム合計はラップタイムと約 `0.044 s` 異なります。これは、現時点では区間境界をまたぐサンプル時刻を補間していないためです。
+
+### 重要な注意
+
+- 表示しているパスは、ゲーム公式の道路中心線ではありません。
+- 理想的なレーシングラインでもありません。
+- 道幅、道路端、縁石、ガードレール、チェックポイント、地形は表現していません。
+- 記録された走行座標から生成した、分析用の基準パスです。
+- ローカルの生テレメトリと生成済み処理データは Git 管理外です。
+- 現在の 2D 表示は、別途修正作業が必要です。
+- リプレイ、テレメトリチャート、走行品質分析はまだ実装していません。
+- 現在のブラウザ入力は大きな処理済み CSV を使っており、将来的には軽量な表示用データ形式が必要です。
+
+### 今後の予定
+
+- コース最低地点を `0 m` とする相対高度表示
+- `0 m` 基準面と縦方向の高さガイド
+- 軽量なブラウザ表示用ラップデータ
+- セクション境界時刻の補間
+- 2D 地図表示の修正
+- テレメトリチャート
+- 3D リプレイ
+- 運転改善ポイントの検出
+- 根拠付きの日本語改善提案
+
+## English
+
+FH6 Goliath Coach is a browser-based telemetry-analysis and reference-path visualization tool for the Goliath course in Forza Horizon 6.
+
+Current capabilities include a 1 m sampled reference path, S1-S6 sections and P1-P5 boundary markers, continuity-constrained telemetry projection, completed-lap extraction, actual-path overlay, section timing, selected-section emphasis, and vehicle/tune metadata save/load.
+
+The displayed path is not official road geometry, not an official road centerline, and not an ideal racing line. It is an analysis reference path generated from recorded driving coordinates.
 
 ## Reference CSV
 
