@@ -30,15 +30,15 @@ const payload = JSON.parse(
   await readFile(new URL("../public/reference/goliath_reference.json", import.meta.url), "utf-8"),
 );
 const columns = Object.fromEntries(payload.point_columns.map((name, index) => [name, index]));
+const baselineDisplayY = payload.coordinate_system.relative_elevation.baseline_display_y;
 
 function renderPoint(point) {
   return new THREE.Vector3(
     point[columns.display_x],
-    point[columns.display_y],
+    point[columns.display_y] - baselineDisplayY,
     -point[columns.display_z],
   );
 }
-
 function nearestPoint(distanceM) {
   return payload.points.reduce((best, point) =>
     Math.abs(point[columns.course_distance_m] - distanceM) <

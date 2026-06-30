@@ -7,6 +7,7 @@ from pathlib import Path
 
 from goliath.config.sections import boundary_markers, build_sections, sections_as_dicts
 from goliath.reference.loader import load_reference_csv
+from goliath.reference.model import ReferencePoint
 
 POINT_COLUMNS = [
     "course_distance_m",
@@ -45,6 +46,7 @@ def build_reference_json(input_csv: Path, output_json: Path) -> dict[str, object
             },
             "display_normalization": "display axis = original position axis - start position axis",
             "display_origin": asdict(origin),
+            "relative_elevation": build_relative_elevation_metadata(points),
         },
         "sections": sections_as_dicts(sections),
         "markers": boundary_markers(sections),
@@ -85,3 +87,25 @@ def build_reference_json(input_csv: Path, output_json: Path) -> dict[str, object
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     return payload
+
+
+def build_relative_elevation_metadata(points: list[ReferencePoint]) -> dict[str, float | str | bool]:
+    minimum_point = min(points, key=lambda point: point.position_y)
+    maximum_point = max(points, key=lambda point: point.position_y)
+    baseline_position_y = minimum_point.position_y
+    baseline_display_y = minimum_point.display_y
+
+    return {
+        "datum": "reference_path_min_position_y",
+        "baseline_position_y": baseline_position_y,
+        "baseline_display_y": baseline_display_y,
+        "minimum_course_distance_m": minimum_point.course_distance_m,
+        "maximum_position_y": maximum_point.position_y,
+        "maximum_display_y": maximum_point.display_y,
+        "maximum_course_distance_m": maximum_point.course_distance_m,
+        "range_m": maximum_point.position_y - baseline_position_y,
+        "start_relative_height_m": points[0].position_y - baseline_position_y,
+        "finish_relative_height_m": points[-1].position_y - baseline_position_y,
+        "units": "m",
+        "is_sea_level_altitude": False,
+    }

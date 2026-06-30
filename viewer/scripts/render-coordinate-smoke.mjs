@@ -17,11 +17,21 @@ await mkdir(directory, { recursive: true });
 const modulePath = join(directory, "renderTransform.mjs");
 await writeFile(modulePath, compiled, "utf-8");
 
-const { displayCoordinatesToRenderVector } = await import(`file:///${modulePath.replaceAll("\\", "/")}`);
-const [renderX, renderY, renderZ] = displayCoordinatesToRenderVector(12.5, -3.25, 44.75, 5);
+const {
+  basePlaneRenderY,
+  displayCoordinatesToRenderVector,
+  getRelativeHeightM,
+  getRenderedRelativeHeightY,
+} = await import(`file:///${modulePath.replaceAll("\\", "/")}`);
+
+const baselineDisplayY = -42.5;
+const [renderX, renderY, renderZ] = displayCoordinatesToRenderVector(12.5, 57.5, 44.75, 5, baselineDisplayY);
 
 assert.equal(renderX, 12.5);
-assert.equal(renderY, -16.25);
+assert.equal(renderY, 500);
 assert.equal(renderZ, -44.75);
+assert.equal(getRelativeHeightM(baselineDisplayY, baselineDisplayY), 0);
+assert.equal(getRenderedRelativeHeightY(baselineDisplayY + 100, baselineDisplayY, 1), 100);
+assert.equal(basePlaneRenderY(), 0);
 
 console.log("render coordinate transform smoke test passed");

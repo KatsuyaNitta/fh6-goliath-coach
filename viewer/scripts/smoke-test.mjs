@@ -31,4 +31,13 @@ assert.deepEqual(
   [17630.242, 31659.142, 42581.232, 60737.384, 74188.316],
 );
 
+const relativeElevation = payload.coordinate_system.relative_elevation;
+assert.equal(relativeElevation.datum, "reference_path_min_position_y");
+assert.equal(relativeElevation.units, "m");
+assert.equal(relativeElevation.is_sea_level_altitude, false);
+assert.ok(Number.isFinite(relativeElevation.baseline_position_y));
+assert.ok(Number.isFinite(relativeElevation.baseline_display_y));
+assert.ok(relativeElevation.range_m > 0);
+assert.ok(relativeElevation.maximum_position_y >= relativeElevation.baseline_position_y);
+
 console.log("generated reference smoke test passed");

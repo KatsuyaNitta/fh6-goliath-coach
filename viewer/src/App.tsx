@@ -18,6 +18,7 @@ export function App() {
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [showReference, setShowReference] = useState(true);
   const [showActual, setShowActual] = useState(true);
+  const [showElevationContext, setShowElevationContext] = useState(true);
   const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export function App() {
   const selectedTelemetrySection = useMemo(() => {
     return projectedLap?.sectionSummaries.find((section) => section.sectionId === selectedSectionId);
   }, [projectedLap, selectedSectionId]);
+  const relativeElevation = reference?.coordinate_system.relative_elevation;
 
   async function handleProjectedLapFile(file: File | undefined): Promise<void> {
     if (!file) {
@@ -67,6 +69,7 @@ export function App() {
               projectedLap={projectedLap}
               showReference={showReference}
               showActual={showActual}
+              showElevationContext={showElevationContext}
             />
             <div className="orientation-indicator" aria-label="Map orientation">
               <span>+X -&gt; right</span>
@@ -177,6 +180,55 @@ export function App() {
           ))}
         </div>
 
+        <label className="context-toggle">
+          <input
+            checked={showElevationContext}
+            onChange={(event) => setShowElevationContext(event.target.checked)}
+            type="checkbox"
+          />
+          Elevation context
+        </label>
+
+        {relativeElevation ? (
+          <section className="section-detail compact-panel">
+            <h2>Relative Elevation</h2>
+            <dl>
+              <div>
+                <dt>Datum</dt>
+                <dd>Course minimum = 0 m</dd>
+              </div>
+              <div>
+                <dt>Start</dt>
+                <dd>{formatRelativeHeight(relativeElevation.start_relative_height_m)}</dd>
+              </div>
+              <div>
+                <dt>Finish</dt>
+                <dd>{formatRelativeHeight(relativeElevation.finish_relative_height_m)}</dd>
+              </div>
+              <div>
+                <dt>Maximum</dt>
+                <dd>{formatRelativeHeight(relativeElevation.range_m)}</dd>
+              </div>
+              <div>
+                <dt>Range</dt>
+                <dd>{relativeElevation.range_m.toFixed(1)} m</dd>
+              </div>
+              <div>
+                <dt>Minimum at</dt>
+                <dd>{(relativeElevation.minimum_course_distance_m / 1000).toFixed(3)} km</dd>
+              </div>
+              <div>
+                <dt>Maximum at</dt>
+                <dd>{(relativeElevation.maximum_course_distance_m / 1000).toFixed(3)} km</dd>
+              </div>
+              <div>
+                <dt>Visual</dt>
+                <dd>{elevationScale}x</dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
+
         <div className="section-list" aria-label="Sections">
           {reference?.sections.map((section) => (
             <button
@@ -229,4 +281,11 @@ function formatSeconds(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds - minutes * 60;
   return `${minutes}:${remainder.toFixed(3).padStart(6, "0")}`;
+}
+
+function formatRelativeHeight(heightM: number): string {
+  if (Math.abs(heightM) < 0.05) {
+    return "0.0 m";
+  }
+  return `${heightM > 0 ? "+" : ""}${heightM.toFixed(1)} m`;
 }

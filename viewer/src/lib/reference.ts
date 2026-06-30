@@ -44,6 +44,21 @@ export interface BoundaryMarker {
   to_section_id: SectionId;
 }
 
+export interface RelativeElevationMetadata {
+  datum: "reference_path_min_position_y";
+  baseline_position_y: number;
+  baseline_display_y: number;
+  minimum_course_distance_m: number;
+  maximum_position_y: number;
+  maximum_display_y: number;
+  maximum_course_distance_m: number;
+  range_m: number;
+  start_relative_height_m: number;
+  finish_relative_height_m: number;
+  units: "m";
+  is_sea_level_altitude: false;
+}
+
 export interface ReferencePayload {
   schema_version: string;
   provenance: {
@@ -56,6 +71,7 @@ export interface ReferencePayload {
       position_y: number;
       position_z: number;
     };
+    relative_elevation: RelativeElevationMetadata;
   };
   sections: SectionDefinition[];
   markers: BoundaryMarker[];
@@ -118,6 +134,36 @@ export function validateReferencePayload(payload: ReferencePayload): void {
   }
   if (payload.points.length === 0) {
     throw new Error("Generated reference data contains no points.");
+  }
+  validateRelativeElevation(payload.coordinate_system.relative_elevation);
+}
+
+function validateRelativeElevation(metadata: RelativeElevationMetadata | undefined): void {
+  if (!metadata) {
+    throw new Error("Generated reference data is missing relative elevation metadata.");
+  }
+  if (metadata.datum !== "reference_path_min_position_y") {
+    throw new Error(`Unexpected relative elevation datum: ${metadata.datum}`);
+  }
+  if (metadata.units !== "m" || metadata.is_sea_level_altitude !== false) {
+    throw new Error("Relative elevation metadata must use metres and must not be sea-level altitude.");
+  }
+  const numericValues = [
+    metadata.baseline_position_y,
+    metadata.baseline_display_y,
+    metadata.minimum_course_distance_m,
+    metadata.maximum_position_y,
+    metadata.maximum_display_y,
+    metadata.maximum_course_distance_m,
+    metadata.range_m,
+    metadata.start_relative_height_m,
+    metadata.finish_relative_height_m,
+  ];
+  if (numericValues.some((value) => !Number.isFinite(value))) {
+    throw new Error("Relative elevation metadata contains a non-finite value.");
+  }
+  if (metadata.range_m < 0) {
+    throw new Error("Relative elevation range must be non-negative.");
   }
 }
 
