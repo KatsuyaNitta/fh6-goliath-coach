@@ -11,7 +11,7 @@ import {
 } from "../lib/renderCoordinates";
 import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCameraPosition } from "../lib/cameraFraming";
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
-import type { ProjectedLapPayload, ProjectedLapPoint } from "../lib/telemetryLap";
+import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 
 const MUTED_SECTION_COLOR = "#343b44";
 const MUTED_MARKER_COLOR = "#7b8490";
@@ -35,6 +35,9 @@ interface CourseSceneProps {
   showReference: boolean;
   showActual: boolean;
   showElevationContext: boolean;
+  showRewinds: boolean;
+  selectedRewindClusterId: string;
+  onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
 }
 
 export function CourseScene({
@@ -46,14 +49,19 @@ export function CourseScene({
   showReference,
   showActual,
   showElevationContext,
+  showRewinds,
+  selectedRewindClusterId,
+  onSelectRewindCluster,
 }: CourseSceneProps) {
   const baselineDisplayY = reference.coordinate_system.relative_elevation.baseline_display_y;
   const bounds = useMemo(
     () => referencePointsToRenderBounds(reference.points, elevationScale, baselineDisplayY),
     [baselineDisplayY, reference.points, elevationScale],
   );
-  const cameraPosition: [number, number, number] =
-    viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds);
+  const cameraPosition = useMemo(
+    () => (viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds)),
+    [bounds, viewMode],
+  );
 
   return (
     <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
@@ -83,6 +91,9 @@ export function CourseScene({
         selectedSectionId={selectedSectionId}
         showReference={showReference}
         showActual={showActual}
+        showRewinds={showRewinds}
+        selectedRewindClusterId={selectedRewindClusterId}
+        onSelectRewindCluster={onSelectRewindCluster}
       />
       <SceneControls bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
     </Canvas>
@@ -309,6 +320,9 @@ function CourseLines({
   selectedSectionId,
   showReference,
   showActual,
+  showRewinds,
+  selectedRewindClusterId,
+  onSelectRewindCluster,
 }: {
   reference: ReferencePayload;
   projectedLap?: ProjectedLapPayload | null;
@@ -317,6 +331,9 @@ function CourseLines({
   selectedSectionId: SectionId;
   showReference: boolean;
   showActual: boolean;
+  showRewinds: boolean;
+  selectedRewindClusterId: string;
+  onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
 }) {
   const sectionPoints = useMemo(() => {
     const grouped = new Map<SectionId, ReferencePointTuple[]>();
@@ -331,7 +348,7 @@ function CourseLines({
 
   const actualSectionPoints = useMemo(() => {
     const grouped = new Map<SectionId, ProjectedLapPoint[]>();
-    for (const point of projectedLap?.points ?? []) {
+    for (const point of projectedLap?.effectivePoints ?? []) {
       const points = grouped.get(point.sectionId) ?? [];
       points.push(point);
       grouped.set(point.sectionId, points);
@@ -444,6 +461,16 @@ function CourseLines({
           />
         );
       }) : null}
+      {showRewinds && projectedLap ? projectedLap.rewindClusters.map((cluster) => (
+        <RewindClusterMarker
+          baselineDisplayY={baselineDisplayY}
+          cluster={cluster}
+          elevationScale={elevationScale}
+          key={cluster.clusterId}
+          onSelect={onSelectRewindCluster}
+          selected={cluster.clusterId === selectedRewindClusterId}
+        />
+      )) : null}
       <Marker
         color="#35f28b"
         label="START"
@@ -462,6 +489,55 @@ function CourseLines({
   );
 }
 
+function RewindClusterMarker({
+  baselineDisplayY,
+  cluster,
+  elevationScale,
+  onSelect,
+  selected,
+}: {
+  baselineDisplayY: number;
+  cluster: RewindClusterPayload;
+  elevationScale: number;
+  onSelect: (cluster: RewindClusterPayload) => void;
+  selected: boolean;
+}) {
+  const point = cluster.points[0];
+  const position = projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY);
+  const color = rewindClusterColor(cluster);
+  return (
+    <group
+      position={position}
+      onClick={(event) => { event.stopPropagation(); onSelect(cluster); }}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <mesh>
+        <sphereGeometry args={[selected ? 180 : 135, 18, 18]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected ? 0.55 : 0.28} />
+      </mesh>
+      <Html distanceFactor={11000} position={[0, 360, 0]} center>
+        <button
+          className={selected ? "rewind-label selected" : "rewind-label"}
+          onClick={(event) => { event.stopPropagation(); onSelect(cluster); }}
+          onPointerDown={(event) => event.stopPropagation()}
+          type="button"
+        >
+          x{cluster.eventCount}
+        </button>
+      </Html>
+    </group>
+  );
+}
+
+function rewindClusterColor(cluster: RewindClusterPayload): string {
+  if (cluster.drivingErrorSuspectedCount > 0) {
+    return "#f59e0b";
+  }
+  if (cluster.externalImpactSuspectedCount > 0) {
+    return "#60a5fa";
+  }
+  return "#94a3b8";
+}
 function markerTouchesSection(
   marker: BoundaryMarker,
   selectedSectionId: SectionId,

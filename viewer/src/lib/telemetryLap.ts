@@ -1,5 +1,9 @@
 import type { SectionId } from "./reference";
 
+export type RewindClassification = "external_impact_suspected" | "driving_error_suspected" | "undetermined" | "";
+export type RewindConfidence = "high" | "medium" | "low" | "";
+export type RewindImpactDirection = "rear" | "front" | "left" | "right" | "unknown" | "";
+
 export interface ProjectedLapPoint {
   sourceRowIndex: number;
   timestampS: number;
@@ -13,6 +17,15 @@ export interface ProjectedLapPoint {
   speedKmh: number;
   manualMarkerId: string;
   excludeFromDrivingAnalysis: boolean;
+  isEffective: boolean;
+  supersededByRewindEventId: string;
+  rewindEventId: string;
+  rewindClusterId: string;
+  rewindClassification: RewindClassification;
+  rewindConfidence: RewindConfidence;
+  rewindImpactDirection: RewindImpactDirection;
+  rewoundTimeS: number | null;
+  rewoundCourseDistanceM: number | null;
 }
 
 export interface ProjectedLapSectionSummary {
@@ -23,11 +36,40 @@ export interface ProjectedLapSectionSummary {
   sampleCount: number;
 }
 
+export interface RewindClusterPayload {
+  clusterId: string;
+  sectionId: SectionId;
+  courseDistanceM: number;
+  eventCount: number;
+  externalImpactSuspectedCount: number;
+  drivingErrorSuspectedCount: number;
+  undeterminedCount: number;
+  confidence: RewindConfidence;
+  impactDirection: RewindImpactDirection;
+  rewoundTimeS: number;
+  rewoundCourseDistanceM: number;
+  eventIds: string[];
+  points: ProjectedLapPoint[];
+}
+
+export interface RewindSummaryPayload {
+  rewindCount: number;
+  externalImpactSuspectedCount: number;
+  drivingErrorSuspectedCount: number;
+  undeterminedCount: number;
+  bySection: Record<SectionId, number>;
+  practiceFocus: RewindClusterPayload[];
+}
+
 export interface ProjectedLapPayload {
   fileName: string;
   totalLapTimeS: number;
   points: ProjectedLapPoint[];
+  effectivePoints: ProjectedLapPoint[];
   markers: ProjectedLapPoint[];
+  rewindEvents: ProjectedLapPoint[];
+  rewindClusters: RewindClusterPayload[];
+  rewindSummary: RewindSummaryPayload;
   sectionSummaries: ProjectedLapSectionSummary[];
 }
 
@@ -46,6 +88,8 @@ const REQUIRED_COLUMNS = [
   "exclude_from_driving_analysis",
 ];
 
+const SECTION_IDS: SectionId[] = ["S1", "S2", "S3", "S4", "S5", "S6"];
+
 export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv"): ProjectedLapPayload {
   const rows = parseCsv(text.trim());
   if (rows.length < 2) {
@@ -60,7 +104,7 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
 
   const points = rows.slice(1).map((row, index) => {
     const sectionId = readString(row, column.section_id, index) as SectionId;
-    if (!["S1", "S2", "S3", "S4", "S5", "S6"].includes(sectionId)) {
+    if (!SECTION_IDS.includes(sectionId)) {
       throw new Error(`Projected lap row ${index + 2} has invalid section_id: ${sectionId}`);
     }
     return {
@@ -76,22 +120,39 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
       speedKmh: readNumber(row, column.speed_kmh, index),
       manualMarkerId: readString(row, column.manual_marker_id, index),
       excludeFromDrivingAnalysis: readString(row, column.exclude_from_driving_analysis, index).toLowerCase() === "true",
+      isEffective: readOptionalBoolean(row, column.is_effective, true),
+      supersededByRewindEventId: readOptionalString(row, column.superseded_by_rewind_event_id),
+      rewindEventId: readOptionalString(row, column.rewind_event_id),
+      rewindClusterId: readOptionalString(row, column.rewind_cluster_id),
+      rewindClassification: readOptionalString(row, column.rewind_classification) as RewindClassification,
+      rewindConfidence: readOptionalString(row, column.rewind_confidence) as RewindConfidence,
+      rewindImpactDirection: readOptionalString(row, column.rewind_impact_direction) as RewindImpactDirection,
+      rewoundTimeS: readOptionalNumber(row, column.rewound_time_s),
+      rewoundCourseDistanceM: readOptionalNumber(row, column.rewound_course_distance_m),
     };
   });
 
-  const first = points[0];
-  const last = points[points.length - 1];
+  const effectivePoints = points.filter((point) => point.isEffective);
+  const timelinePoints = effectivePoints.length > 0 ? effectivePoints : points;
+  const first = timelinePoints[0];
+  const last = timelinePoints[timelinePoints.length - 1];
+  const rewindEvents = points.filter((point) => point.rewindEventId !== "");
+  const rewindClusters = buildRewindClusters(rewindEvents);
   return {
     fileName,
     totalLapTimeS: last.lapTimeS - first.lapTimeS,
     points,
+    effectivePoints,
     markers: points.filter((point) => point.manualMarkerId !== ""),
-    sectionSummaries: buildSectionSummaries(points),
+    rewindEvents,
+    rewindClusters,
+    rewindSummary: buildRewindSummary(rewindClusters),
+    sectionSummaries: buildSectionSummaries(timelinePoints),
   };
 }
 
 function buildSectionSummaries(points: ProjectedLapPoint[]): ProjectedLapSectionSummary[] {
-  return (["S1", "S2", "S3", "S4", "S5", "S6"] as SectionId[]).map((sectionId) => {
+  return SECTION_IDS.map((sectionId) => {
     const sectionPoints = points.filter((point) => point.sectionId === sectionId);
     if (sectionPoints.length === 0) {
       return {
@@ -112,6 +173,61 @@ function buildSectionSummaries(points: ProjectedLapPoint[]): ProjectedLapSection
       sampleCount: sectionPoints.length,
     };
   });
+}
+
+function buildRewindClusters(events: ProjectedLapPoint[]): RewindClusterPayload[] {
+  const grouped = new Map<string, ProjectedLapPoint[]>();
+  for (const event of events) {
+    const key = event.rewindClusterId || event.rewindEventId;
+    grouped.set(key, [...(grouped.get(key) ?? []), event]);
+  }
+  return [...grouped.entries()].map(([clusterId, points]) => {
+    const first = points[0];
+    return {
+      clusterId,
+      sectionId: first.sectionId,
+      courseDistanceM: average(points.map((point) => point.courseDistanceM)),
+      eventCount: points.length,
+      externalImpactSuspectedCount: points.filter((point) => point.rewindClassification === "external_impact_suspected").length,
+      drivingErrorSuspectedCount: points.filter((point) => point.rewindClassification === "driving_error_suspected").length,
+      undeterminedCount: points.filter((point) => point.rewindClassification === "undetermined").length,
+      confidence: highestConfidence(points.map((point) => point.rewindConfidence)),
+      impactDirection: first.rewindImpactDirection || "unknown",
+      rewoundTimeS: sum(points.map((point) => point.rewoundTimeS ?? 0)),
+      rewoundCourseDistanceM: sum(points.map((point) => point.rewoundCourseDistanceM ?? 0)),
+      eventIds: points.map((point) => point.rewindEventId),
+      points,
+    };
+  });
+}
+
+function buildRewindSummary(clusters: RewindClusterPayload[]): RewindSummaryPayload {
+  const bySection = Object.fromEntries(SECTION_IDS.map((sectionId) => [sectionId, 0])) as Record<SectionId, number>;
+  for (const cluster of clusters) {
+    bySection[cluster.sectionId] += cluster.eventCount;
+  }
+  const practiceFocus = clusters
+    .filter((cluster) => cluster.drivingErrorSuspectedCount > 0 && ["high", "medium"].includes(cluster.confidence))
+    .sort((left, right) => right.drivingErrorSuspectedCount - left.drivingErrorSuspectedCount)
+    .slice(0, 3);
+  return {
+    rewindCount: sum(clusters.map((cluster) => cluster.eventCount)),
+    externalImpactSuspectedCount: sum(clusters.map((cluster) => cluster.externalImpactSuspectedCount)),
+    drivingErrorSuspectedCount: sum(clusters.map((cluster) => cluster.drivingErrorSuspectedCount)),
+    undeterminedCount: sum(clusters.map((cluster) => cluster.undeterminedCount)),
+    bySection,
+    practiceFocus,
+  };
+}
+
+export function classificationLabel(classification: RewindClassification): string {
+  if (classification === "external_impact_suspected") {
+    return "External impact suspected";
+  }
+  if (classification === "driving_error_suspected") {
+    return "Driving error suspected";
+  }
+  return "Undetermined";
 }
 
 function parseCsv(text: string): string[][] {
@@ -166,4 +282,50 @@ function readString(row: string[], columnIndex: number, rowIndex: number): strin
     throw new Error(`Projected lap row ${rowIndex + 2} is shorter than the header.`);
   }
   return value;
+}
+
+function readOptionalString(row: string[], columnIndex: number | undefined): string {
+  if (columnIndex === undefined) {
+    return "";
+  }
+  return row[columnIndex] ?? "";
+}
+
+function readOptionalBoolean(row: string[], columnIndex: number | undefined, defaultValue: boolean): boolean {
+  if (columnIndex === undefined || row[columnIndex] === undefined || row[columnIndex] === "") {
+    return defaultValue;
+  }
+  return row[columnIndex].toLowerCase() === "true";
+}
+
+function readOptionalNumber(row: string[], columnIndex: number | undefined): number | null {
+  if (columnIndex === undefined || row[columnIndex] === undefined || row[columnIndex] === "") {
+    return null;
+  }
+  const value = Number(row[columnIndex]);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function highestConfidence(values: RewindConfidence[]): RewindConfidence {
+  if (values.includes("high")) {
+    return "high";
+  }
+  if (values.includes("medium")) {
+    return "medium";
+  }
+  if (values.includes("low")) {
+    return "low";
+  }
+  return "";
+}
+
+function average(values: number[]): number {
+  return values.length === 0 ? 0 : sum(values) / values.length;
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
 }

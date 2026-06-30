@@ -17,6 +17,7 @@ def project_lap_to_reference(
     base_forward_window_m: int = 120,
     speed_window_multiplier: float = 2.0,
     uncertain_error_threshold_m: float = 60.0,
+    first_point_full_scan: bool = False,
 ) -> tuple[list[ProjectedSample], ProjectionSummary]:
     if not rows:
         raise ValueError("cannot project an empty lap")
@@ -29,8 +30,12 @@ def project_lap_to_reference(
 
     for row in rows:
         if previous_index is None or previous_row is None:
-            search_start = 0
-            search_end = min(len(reference_points) - 1, base_forward_window_m * 5)
+            if first_point_full_scan:
+                search_start = 0
+                search_end = len(reference_points) - 1
+            else:
+                search_start = 0
+                search_end = min(len(reference_points) - 1, base_forward_window_m * 5)
         else:
             delta_t = max(0.0, row.lap_time_s - previous_row.lap_time_s)
             speed_mps = max(row.speed_kmh, previous_row.speed_kmh) / 3.6
@@ -57,20 +62,7 @@ def project_lap_to_reference(
                 backward_jump = reference_index < previous_index - backward_allowance_m
                 uncertain = error > uncertain_error_threshold_m or backward_jump
 
-        point = reference_points[reference_index]
-        projected.append(
-            ProjectedSample(
-                row=row,
-                reference_index=reference_index,
-                course_distance_m=point.course_distance_m,
-                projection_error_m=error,
-                section_id=assign_section_id(point.course_distance_m),
-                uncertain_mapping=uncertain,
-                telemetry_display_x=row.position_x - origin.position_x,
-                telemetry_display_y=row.position_y - origin.position_y,
-                telemetry_display_z=row.position_z - origin.position_z,
-            )
-        )
+        projected.append(project_row_with_reference_index(row, reference_points, origin, reference_index, error, uncertain))
         previous_index = reference_index
         previous_row = row
 
@@ -80,6 +72,46 @@ def project_lap_to_reference(
         median_error_m=median(errors),
         max_error_m=max(errors),
         uncertain_mapping_count=sum(1 for sample in projected if sample.uncertain_mapping),
+    )
+
+
+def project_single_row_to_reference(
+    row: TelemetryRow,
+    reference_points: list[ReferencePoint],
+    origin: DisplayOrigin,
+    *,
+    uncertain_error_threshold_m: float = 60.0,
+) -> ProjectedSample:
+    reference_index, error = _nearest_reference_index(row, reference_points, 0, len(reference_points) - 1)
+    return project_row_with_reference_index(
+        row,
+        reference_points,
+        origin,
+        reference_index,
+        error,
+        error > uncertain_error_threshold_m,
+    )
+
+
+def project_row_with_reference_index(
+    row: TelemetryRow,
+    reference_points: list[ReferencePoint],
+    origin: DisplayOrigin,
+    reference_index: int,
+    error: float,
+    uncertain: bool,
+) -> ProjectedSample:
+    point = reference_points[reference_index]
+    return ProjectedSample(
+        row=row,
+        reference_index=reference_index,
+        course_distance_m=point.course_distance_m,
+        projection_error_m=error,
+        section_id=assign_section_id(point.course_distance_m),
+        uncertain_mapping=uncertain,
+        telemetry_display_x=row.position_x - origin.position_x,
+        telemetry_display_y=row.position_y - origin.position_y,
+        telemetry_display_z=row.position_z - origin.position_z,
     )
 
 
@@ -102,4 +134,3 @@ def _nearest_reference_index(
             best_index = index
             best_distance_sq = distance_sq
     return best_index, math.sqrt(best_distance_sq)
-

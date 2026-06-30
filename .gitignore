@@ -23,3 +23,4 @@ data/processed/
 
 !tests/fixtures/**/*_telemetry.csv
 !tests/fixtures/**/*_session.json
+TASKS.md

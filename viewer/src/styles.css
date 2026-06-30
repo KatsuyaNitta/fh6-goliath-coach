@@ -405,7 +405,56 @@ textarea {
 .compact-panel {
   padding-top: 14px;
 }
-@media (max-width: 860px) {
+
+.rewind-label {
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.rewind-label.selected {
+  border-color: #facc15;
+  background: rgba(82, 63, 20, 0.86);
+  color: #fff7cc;
+}
+
+.rewind-section-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  color: #b9c3ce;
+  font-size: 12px;
+}
+
+.rewind-detail,
+.practice-focus {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #303946;
+  padding-top: 12px;
+}
+
+.rewind-detail h3,
+.practice-focus b {
+  margin: 0;
+  color: #eef2f7;
+  font-size: 13px;
+}
+
+.practice-focus button {
+  border: 1px solid #34404c;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #20262e;
+  color: #eef2f7;
+  cursor: pointer;
+  text-align: left;
+}@media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -419,4 +468,33 @@ textarea {
     border-left: 0;
     border-top: 1px solid #2b323b;
   }
+}
+
+.rewind-event-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rewind-event-list button,
+.text-button {
+  border: 1px solid #334155;
+  background: #151b24;
+  color: #dbe7f3;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rewind-event-list button.selected {
+  border-color: #f59e0b;
+  color: #fff7ed;
+  background: #312314;
+}
+
+.text-button {
+  margin-top: 8px;
+  color: #a9b8c7;
 }

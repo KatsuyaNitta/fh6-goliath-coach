@@ -16,6 +16,27 @@ class TelemetryRow:
     speed_kmh: float
     handbrake_raw: float
     handbrake_pct: float
+    packet_index: int = 0
+    kept_index: int = 0
+    game_elapsed_s: float = 0.0
+    session_elapsed_s: float = 0.0
+    current_race_time_s: float = 0.0
+    distance_traveled: float = 0.0
+    accel_x: float = 0.0
+    accel_y: float = 0.0
+    accel_z: float = 0.0
+    velocity_x: float = 0.0
+    velocity_y: float = 0.0
+    velocity_z: float = 0.0
+    angular_velocity_x: float = 0.0
+    angular_velocity_y: float = 0.0
+    angular_velocity_z: float = 0.0
+    yaw: float = 0.0
+    pitch: float = 0.0
+    roll: float = 0.0
+    accel_pct: float = 0.0
+    brake_pct: float = 0.0
+    steer_norm: float = 0.0
 
     @property
     def handbrake_active(self) -> bool:
@@ -93,6 +114,15 @@ class ProjectedSample:
     telemetry_display_z: float
     marker_id: str = ""
     exclude_from_driving_analysis: bool = False
+    is_effective: bool = True
+    superseded_by_rewind_event_id: str = ""
+    rewind_event_id: str = ""
+    rewind_cluster_id: str = ""
+    rewind_classification: str = ""
+    rewind_confidence: str = ""
+    rewind_impact_direction: str = ""
+    rewound_time_s: float | None = None
+    rewound_course_distance_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -101,4 +131,3 @@ class ProjectionSummary:
     median_error_m: float
     max_error_m: float
     uncertain_mapping_count: int
-

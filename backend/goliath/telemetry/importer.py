@@ -23,6 +23,27 @@ REQUIRED_COLUMNS = (
 )
 
 REQUIRED_NUMERIC_COLUMNS = REQUIRED_COLUMNS
+OPTIONAL_NUMERIC_COLUMNS = (
+    "packet_index",
+    "kept_index",
+    "current_race_time",
+    "distance_traveled",
+    "accel_x",
+    "accel_y",
+    "accel_z",
+    "velocity_x",
+    "velocity_y",
+    "velocity_z",
+    "angular_velocity_x",
+    "angular_velocity_y",
+    "angular_velocity_z",
+    "yaw",
+    "pitch",
+    "roll",
+    "accel_pct",
+    "brake_pct",
+    "steer_norm",
+)
 
 
 def load_telemetry_session(session_dir: Path) -> TelemetrySession:
@@ -77,6 +98,10 @@ def _parse_row(row: dict[str, str], source_row_index: int) -> TelemetryRow:
         column: _parse_required_float(row, column, source_row_index)
         for column in REQUIRED_NUMERIC_COLUMNS
     }
+    optional = {
+        column: _parse_optional_float(row, column, source_row_index)
+        for column in OPTIONAL_NUMERIC_COLUMNS
+    }
     timestamp_s = numeric["game_elapsed_s"]
     if timestamp_s == 0 and numeric["session_elapsed_s"] > 0:
         timestamp_s = numeric["game_elapsed_s"]
@@ -92,6 +117,27 @@ def _parse_row(row: dict[str, str], source_row_index: int) -> TelemetryRow:
         speed_kmh=numeric["speed_kmh"],
         handbrake_raw=numeric["handbrake_raw"],
         handbrake_pct=numeric["handbrake_pct"],
+        packet_index=int(optional["packet_index"]),
+        kept_index=int(optional["kept_index"]),
+        game_elapsed_s=numeric["game_elapsed_s"],
+        session_elapsed_s=numeric["session_elapsed_s"],
+        current_race_time_s=optional["current_race_time"],
+        distance_traveled=optional["distance_traveled"],
+        accel_x=optional["accel_x"],
+        accel_y=optional["accel_y"],
+        accel_z=optional["accel_z"],
+        velocity_x=optional["velocity_x"],
+        velocity_y=optional["velocity_y"],
+        velocity_z=optional["velocity_z"],
+        angular_velocity_x=optional["angular_velocity_x"],
+        angular_velocity_y=optional["angular_velocity_y"],
+        angular_velocity_z=optional["angular_velocity_z"],
+        yaw=optional["yaw"],
+        pitch=optional["pitch"],
+        roll=optional["roll"],
+        accel_pct=optional["accel_pct"],
+        brake_pct=optional["brake_pct"],
+        steer_norm=optional["steer_norm"],
     )
 
 
@@ -99,6 +145,17 @@ def _parse_required_float(row: dict[str, str], column: str, source_row_index: in
     raw = row.get(column)
     if raw is None or raw == "":
         raise ValueError(f"telemetry row {source_row_index} has an empty value for {column}")
+    return _parse_float(raw, column, source_row_index)
+
+
+def _parse_optional_float(row: dict[str, str], column: str, source_row_index: int) -> float:
+    raw = row.get(column)
+    if raw is None or raw == "":
+        return 0.0
+    return _parse_float(raw, column, source_row_index)
+
+
+def _parse_float(raw: str, column: str, source_row_index: int) -> float:
     try:
         value = float(raw)
     except ValueError as exc:
@@ -144,4 +201,3 @@ def _build_sample_stats(rows: list[TelemetryRow]) -> SampleStats:
         max_sample_interval_s=max_interval,
         large_sampling_gaps=gaps,
     )
-

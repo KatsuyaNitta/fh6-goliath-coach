@@ -3,7 +3,9 @@ import type { ReferencePayload, SectionDefinition, SectionId } from "./lib/refer
 import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
 import { VehicleTunePanel } from "./components/VehicleTunePanel";
-import { parseProjectedLapCsv, type ProjectedLapPayload } from "./lib/telemetryLap";
+import { classificationLabel, parseProjectedLapCsv, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
+import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
+import { sectionForRewindSelection } from "./lib/rewindSelection";
 
 type ViewMode = "3d" | "2d";
 
@@ -11,7 +13,7 @@ export function App() {
   const [reference, setReference] = useState<ReferencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<SectionId>("S1");
-  const [elevationScale, setElevationScale] = useState(1);
+  const [elevationScale, setElevationScale] = useState(5);
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
@@ -19,6 +21,9 @@ export function App() {
   const [showReference, setShowReference] = useState(true);
   const [showActual, setShowActual] = useState(true);
   const [showElevationContext, setShowElevationContext] = useState(true);
+  const [showRewinds, setShowRewinds] = useState(true);
+  const [selectedRewindClusterId, setSelectedRewindClusterId] = useState("");
+  const [selectedRewindEventId, setSelectedRewindEventId] = useState("");
   const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -39,6 +44,53 @@ export function App() {
     return projectedLap?.sectionSummaries.find((section) => section.sectionId === selectedSectionId);
   }, [projectedLap, selectedSectionId]);
   const relativeElevation = reference?.coordinate_system.relative_elevation;
+  const selectedRewindCluster = useMemo<RewindClusterPayload | undefined>(() => {
+    return projectedLap?.rewindClusters.find((cluster) => cluster.clusterId === selectedRewindClusterId);
+  }, [projectedLap, selectedRewindClusterId]);
+  const selectedRewindEvent = useMemo<ProjectedLapPoint | undefined>(() => {
+    if (!selectedRewindEventId) {
+      return undefined;
+    }
+    return projectedLap?.rewindEvents.find((event) => event.rewindEventId === selectedRewindEventId);
+  }, [projectedLap, selectedRewindEventId]);
+  const selectedRewindDetailPoint = selectedRewindEvent ?? selectedRewindCluster?.points[0];
+
+  function selectRewindCluster(cluster: RewindClusterPayload | undefined): void {
+    if (!cluster) {
+      return;
+    }
+    setSelectedRewindClusterId(cluster.clusterId);
+    setSelectedRewindEventId("");
+    setSelectedSectionId((current) => sectionForRewindSelection(current, cluster.sectionId));
+  }
+
+  function selectRewindEvent(event: ProjectedLapPoint | undefined): void {
+    if (!event) {
+      return;
+    }
+    setSelectedRewindClusterId(event.rewindClusterId || event.rewindEventId);
+    setSelectedRewindEventId(event.rewindEventId);
+    setSelectedSectionId((current) => sectionForRewindSelection(current, event.sectionId));
+  }
+
+  function clearRewindSelection(): void {
+    setSelectedRewindClusterId("");
+    setSelectedRewindEventId("");
+  }
+  const cameraLifecycleKey = useMemo(() => {
+    const referenceIdentity = reference
+      ? `${reference.schema_version}:${reference.stats.point_count}:${reference.start_finish.finish_course_distance_m.toFixed(3)}`
+      : "no-reference";
+    const telemetryIdentity = projectedLap
+      ? `${projectedLap.fileName}:${projectedLap.points.length}:${projectedLap.totalLapTimeS.toFixed(3)}`
+      : "no-telemetry";
+    return buildCameraLifecycleKey({
+      referenceIdentity,
+      telemetryIdentity,
+      viewMode,
+      resetToken: cameraResetKey,
+    });
+  }, [cameraResetKey, projectedLap, reference, viewMode]);
 
   async function handleProjectedLapFile(file: File | undefined): Promise<void> {
     if (!file) {
@@ -46,9 +98,15 @@ export function App() {
     }
     try {
       const text = await file.text();
-      setProjectedLap(parseProjectedLapCsv(text, file.name));
+      const parsed = parseProjectedLapCsv(text, file.name);
+      setProjectedLap(parsed);
+      const firstRewindCluster = parsed.rewindClusters[0];
+      setSelectedRewindClusterId(firstRewindCluster?.clusterId ?? "");
+      setSelectedRewindEventId("");
+      setSelectedSectionId((current) => sectionForRewindSelection(current, firstRewindCluster?.sectionId));
       setTelemetryError(null);
       setShowActual(true);
+      setShowRewinds(parsed.rewindClusters.length > 0);
     } catch (caught: unknown) {
       setTelemetryError(caught instanceof Error ? caught.message : "Failed to load projected lap.");
       setProjectedLap(null);
@@ -61,7 +119,7 @@ export function App() {
         {reference ? (
           <>
             <CourseScene
-              key={`${viewMode}-${cameraResetKey}`}
+              key={cameraLifecycleKey}
               reference={reference}
               elevationScale={elevationScale}
               selectedSectionId={selectedSectionId}
@@ -70,6 +128,9 @@ export function App() {
               showReference={showReference}
               showActual={showActual}
               showElevationContext={showElevationContext}
+              showRewinds={showRewinds && Boolean(projectedLap?.rewindClusters.length)}
+              selectedRewindClusterId={selectedRewindClusterId}
+              onSelectRewindCluster={selectRewindCluster}
             />
             <div className="orientation-indicator" aria-label="Map orientation">
               <span>+X -&gt; right</span>
@@ -146,6 +207,15 @@ export function App() {
               Actual
             </label>
           </div>
+          <label className="context-toggle">
+            <input
+              checked={showRewinds}
+              disabled={!projectedLap?.rewindClusters.length}
+              onChange={(event) => setShowRewinds(event.target.checked)}
+              type="checkbox"
+            />
+            Rewinds
+          </label>
           {projectedLap ? (
             <dl className="compact-stats">
               <div>
@@ -229,6 +299,70 @@ export function App() {
           </section>
         ) : null}
 
+
+        {projectedLap && projectedLap.rewindSummary.rewindCount > 0 ? (
+          <section className="section-detail compact-panel">
+            <h2>Rewinds</h2>
+            <dl>
+              <div>
+                <dt>Rewinds</dt>
+                <dd>{projectedLap.rewindSummary.rewindCount}</dd>
+              </div>
+              <div>
+                <dt>External</dt>
+                <dd>{projectedLap.rewindSummary.externalImpactSuspectedCount}</dd>
+              </div>
+              <div>
+                <dt>Driving</dt>
+                <dd>{projectedLap.rewindSummary.drivingErrorSuspectedCount}</dd>
+              </div>
+              <div>
+                <dt>Unclear</dt>
+                <dd>{projectedLap.rewindSummary.undeterminedCount}</dd>
+              </div>
+            </dl>
+            <p className="status-text">External impact suspected is a cautious inference from abrupt impulses or speed changes. It does not identify AI cars, walls, or terrain.</p>
+            <div className="rewind-section-breakdown">
+              {Object.entries(projectedLap.rewindSummary.bySection).map(([sectionId, count]) => (
+                <span key={sectionId}>{sectionId}: {count}</span>
+              ))}
+            </div>
+            {selectedRewindCluster && selectedRewindDetailPoint ? (
+              <div className="rewind-detail">
+                <h3>{selectedRewindCluster.clusterId} {selectedRewindCluster.sectionId}</h3>
+                <dl>
+                  <div><dt>Distance</dt><dd>{(selectedRewindDetailPoint.courseDistanceM / 1000).toFixed(3)} km</dd></div>
+                  <div><dt>Events</dt><dd>{selectedRewindCluster.eventCount}</dd></div>
+                  <div><dt>Class</dt><dd>{classificationLabel(selectedRewindDetailPoint.rewindClassification)}</dd></div>
+                  <div><dt>Confidence</dt><dd>{selectedRewindDetailPoint.rewindConfidence || selectedRewindCluster.confidence || "low"}</dd></div>
+                  <div><dt>Rewound</dt><dd>{(selectedRewindDetailPoint.rewoundTimeS ?? selectedRewindCluster.rewoundTimeS).toFixed(1)} s / {(selectedRewindDetailPoint.rewoundCourseDistanceM ?? selectedRewindCluster.rewoundCourseDistanceM).toFixed(0)} m</dd></div>
+                  <div><dt>Direction</dt><dd>{selectedRewindDetailPoint.rewindImpactDirection || selectedRewindCluster.impactDirection || "unknown"}</dd></div>
+                </dl>
+                <div className="rewind-event-list" aria-label="Rewind events">
+                  {selectedRewindCluster.points.map((point) => (
+                    <button
+                      className={point.rewindEventId === selectedRewindEventId ? "selected" : ""}
+                      key={point.rewindEventId}
+                      type="button"
+                      onClick={() => selectRewindEvent(point)}
+                    >
+                      {point.rewindEventId}
+                    </button>
+                  ))}
+                </div>
+                <button className="text-button" type="button" onClick={clearRewindSelection}>Clear rewind selection</button>
+              </div>
+            ) : null}
+            <div className="practice-focus">
+              <b>Practice focus</b>
+              {projectedLap.rewindSummary.practiceFocus.length > 0 ? projectedLap.rewindSummary.practiceFocus.map((cluster) => (
+                <button key={cluster.clusterId} type="button" onClick={() => selectRewindCluster(cluster)}>
+                  {cluster.sectionId} {(cluster.courseDistanceM / 1000).toFixed(1)} km
+                </button>
+              )) : <p className="status-text">No high-confidence practice focus identified.</p>}
+            </div>
+          </section>
+        ) : null}
         <div className="section-list" aria-label="Sections">
           {reference?.sections.map((section) => (
             <button
