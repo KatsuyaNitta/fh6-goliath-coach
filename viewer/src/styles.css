@@ -626,3 +626,165 @@ textarea {
 .error-text {
   color: #fca5a5;
 }
+.analysis-column {
+  display: grid;
+  grid-template-rows: minmax(520px, 68vh) auto;
+  min-width: 0;
+  min-height: 100vh;
+  overflow: auto;
+}
+
+.analysis-column .viewer-surface {
+  min-height: 520px;
+}
+
+.telemetry-charts-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #2b323b;
+  padding: 16px;
+  background: #11161d;
+}
+
+.telemetry-charts-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.telemetry-chart-controls {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 8px;
+}
+
+.telemetry-chart-controls button {
+  border: 1px solid #34404c;
+  border-radius: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  background: #20262e;
+  color: #eef2f7;
+  cursor: pointer;
+}
+
+.telemetry-chart-controls button.active {
+  border-color: #66d9e8;
+  background: #26313a;
+}
+
+.telemetry-chart-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.telemetry-cursor-readout {
+  border: 1px solid #2d3743;
+  border-radius: 8px;
+  padding: 10px;
+  background: #151b24;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.telemetry-cursor-readout dl {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(92px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.telemetry-cursor-readout div {
+  min-width: 0;
+}
+
+.telemetry-cursor-readout dt {
+  color: #8f9ba8;
+}
+
+.telemetry-cursor-readout dd {
+  margin: 0;
+  color: #f8fafc;
+  overflow-wrap: anywhere;
+}
+
+.telemetry-chart-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.telemetry-chart-track {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.telemetry-chart-label {
+  display: grid;
+  gap: 3px;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.telemetry-chart-label span,
+.telemetry-chart-description,
+.telemetry-chart-description-text {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.telemetry-chart-canvas-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 124px;
+  border: 1px solid #2a3440;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #121821;
+  touch-action: none;
+}
+
+.telemetry-chart-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 124px;
+}
+
+.telemetry-chart-canvas.overlay {
+  pointer-events: none;
+}
+
+.telemetry-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(18, 24, 33, 0.76);
+  color: #cbd5e1;
+  font-size: 13px;
+  text-align: center;
+}
+
+.telemetry-cursor-label {
+  border-color: rgba(34, 211, 238, 0.72);
+  color: #e0faff;
+}
+
+@media (max-width: 1100px) {
+  .telemetry-charts-header,
+  .telemetry-cursor-readout dl {
+    grid-template-columns: 1fr;
+  }
+
+  .telemetry-chart-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .telemetry-chart-track {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,4 @@
-# FH6 Goliath Coach
+﻿# FH6 Goliath Coach
 
 ## 日本語
 
@@ -151,6 +151,21 @@ data\processed\20260629_184938\
 
 Large processed outputs are generated locally and ignored by Git.
 
+## Recording Contract for Completed-Lap Extraction
+
+採用したい走行の前に録画を開始してください。ポーズ、巻き戻し、任意地点からのリスタートは許容されます。採用する完走は1録画につき1回だけとし、フィニッシュ後にラップタイマーがリセットされてから録画を停止してください。複数の完走や、完走後の再走行は現在サポートしていません。
+
+Current processing is restart-aware:
+
+- Hard timer resets split the raw recording into attempt candidates.
+- The selected attempt is the attempt immediately before the final hard timer reset.
+- Rewind normalization runs only inside the selected attempt.
+- Restart boundaries and the final finish reset are not counted as ordinary rewinds.
+- Recordings without a final finish reset are currently unsupported.
+- Recordings with multiple completed laps are currently unsupported.
+- Ambiguous or incomplete recordings are rejected instead of producing a misleading lap.
+
+This keeps post-finish zero-time tails from replacing the actual completed lap.
 ## Backend Tests
 
 ```powershell
@@ -263,6 +278,31 @@ Invoke-RestMethod http://127.0.0.1:8765/api/health
 Invoke-RestMethod "http://127.0.0.1:8765/api/sessions?include_ignored=true"
 Invoke-WebRequest http://127.0.0.1:8765/api/sessions/20260630_005550/projected-lap -OutFile data\local\api-smoke-projected-lap.csv
 ```
+
+## Telemetry Charts MVP
+
+Loaded projected laps now show four distance-based Canvas telemetry tracks:
+
+- Speed, in `km/h`;
+- Throttle, from projected-lap `accel_pct`, in percent;
+- Brake, from `brake_pct`, in percent;
+- Steering, from `steer_norm`, displayed as raw normalized input from `-1` to `+1` without left/right interpretation.
+
+The shared x-axis is `course_distance_m`, displayed in kilometres. Use **Full lap** to inspect the complete lap or **Selected section** to focus on the currently selected S1-S6 section. The charts draw subtle S1-S6 background bands, P1-P5 reference marker lines, and rewind event markers.
+
+Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a lightweight cursor marker on the 3D/2D course. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
+
+Older processed projected-lap CSVs remain supported. They can still render the course path and Speed chart; Throttle, Brake, and Steering show an unavailable message until the session is reprocessed. No automatic migration, overwrite, or force-processing is performed from the browser.
+
+To generate a new charts-capable output without touching existing processed data, use a separate ignored root:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach
+$env:PYTHONPATH="$PWD\backend"
+.\.venv\Scripts\python.exe -m goliath.cli process-session-id 20260630_005550 --processed-root data\local\processed-charts-smoke
+```
+
+Chart decimation is display-only. It preserves bucket first/last samples and channel extrema so short brake pulses, throttle lifts, and steering extremes remain visible without changing analysis data.
 ## Managed Local Sessions
 
 FH6_telemetry can finalize recordings into the local Goliath Coach handoff area:

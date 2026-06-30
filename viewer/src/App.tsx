@@ -4,6 +4,7 @@ import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
 import { VehicleTunePanel } from "./components/VehicleTunePanel";
 import { SessionBrowserPanel } from "./components/SessionBrowserPanel";
+import { TelemetryChartsPanel } from "./components/TelemetryChartsPanel";
 import { classificationLabel, parseProjectedLapCsv, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { sectionForRewindSelection } from "./lib/rewindSelection";
@@ -26,6 +27,8 @@ export function App() {
   const [showRewinds, setShowRewinds] = useState(true);
   const [selectedRewindClusterId, setSelectedRewindClusterId] = useState("");
   const [selectedRewindEventId, setSelectedRewindEventId] = useState("");
+  const [hoveredTelemetryPoint, setHoveredTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
+  const [pinnedTelemetryPoint, setPinnedTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
   const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export function App() {
     return projectedLap?.rewindEvents.find((event) => event.rewindEventId === selectedRewindEventId);
   }, [projectedLap, selectedRewindEventId]);
   const selectedRewindDetailPoint = selectedRewindEvent ?? selectedRewindCluster?.points[0];
+  const activeTelemetryPoint = hoveredTelemetryPoint ?? pinnedTelemetryPoint;
 
   function selectRewindCluster(cluster: RewindClusterPayload | undefined): void {
     if (!cluster) {
@@ -102,6 +106,8 @@ export function App() {
     setSelectedRewindEventId("");
     setSelectedSectionId((current) => sectionForRewindSelection(current, firstRewindCluster?.sectionId));
     setTelemetryError(null);
+    setHoveredTelemetryPoint(null);
+    setPinnedTelemetryPoint(null);
     setShowActual(true);
     setShowRewinds(parsed.rewindClusters.length > 0);
   }
@@ -118,12 +124,15 @@ export function App() {
       setTelemetryError(caught instanceof Error ? caught.message : "Failed to load projected lap.");
       setProjectedLap(null);
       setLoadedSessionId("");
+      setHoveredTelemetryPoint(null);
+      setPinnedTelemetryPoint(null);
     }
   }
 
   return (
     <main className="app-shell">
-      <section className="viewer-surface">
+      <div className="analysis-column">
+        <section className="viewer-surface">
         {reference ? (
           <>
             <CourseScene
@@ -139,6 +148,7 @@ export function App() {
               showRewinds={showRewinds && Boolean(projectedLap?.rewindClusters.length)}
               selectedRewindClusterId={selectedRewindClusterId}
               onSelectRewindCluster={selectRewindCluster}
+              activeTelemetryPoint={activeTelemetryPoint}
             />
             <div className="orientation-indicator" aria-label="Map orientation">
               <span>+X -&gt; right</span>
@@ -147,8 +157,20 @@ export function App() {
           </>
         ) : (
           <div className="load-state">{error ?? "Loading Goliath reference path..."}</div>
-        )}
-      </section>
+        )}        </section>
+        <TelemetryChartsPanel
+          activeTelemetryPoint={activeTelemetryPoint}
+          onHoverTelemetryPoint={setHoveredTelemetryPoint}
+          onPinTelemetryPoint={setPinnedTelemetryPoint}
+          onSelectRewindCluster={selectRewindCluster}
+          onSelectSection={setSelectedSectionId}
+          pinnedTelemetryPoint={pinnedTelemetryPoint}
+          projectedLap={projectedLap}
+          reference={reference}
+          selectedRewindClusterId={selectedRewindClusterId}
+          selectedSectionId={selectedSectionId}
+        />
+      </div>
 
       <aside className="control-panel" aria-label="Goliath reference controls">
         <div className="title-block">

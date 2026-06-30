@@ -23,6 +23,9 @@ export interface ProjectedLapPoint {
   displayY: number;
   displayZ: number;
   speedKmh: number;
+  throttlePct: number | null;
+  brakePct: number | null;
+  steerNorm: number | null;
   manualMarkerId: string;
   excludeFromDrivingAnalysis: boolean;
   isEffective: boolean;
@@ -69,6 +72,13 @@ export interface RewindSummaryPayload {
   practiceFocus: RewindClusterPayload[];
 }
 
+export interface ProjectedLapChannelAvailability {
+  speed: boolean;
+  throttle: boolean;
+  brake: boolean;
+  steering: boolean;
+}
+
 export interface ProjectedLapPayload {
   fileName: string;
   sessionId: string;
@@ -81,6 +91,7 @@ export interface ProjectedLapPayload {
   rewindClusters: RewindClusterPayload[];
   rewindSummary: RewindSummaryPayload;
   sectionSummaries: ProjectedLapSectionSummary[];
+  channelAvailability: ProjectedLapChannelAvailability;
 }
 
 const REQUIRED_COLUMNS = [
@@ -128,6 +139,9 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
       displayY: readNumber(row, column.telemetry_display_y, index),
       displayZ: readNumber(row, column.telemetry_display_z, index),
       speedKmh: readNumber(row, column.speed_kmh, index),
+      throttlePct: readOptionalNumber(row, column.accel_pct),
+      brakePct: readOptionalNumber(row, column.brake_pct),
+      steerNorm: readOptionalNumber(row, column.steer_norm),
       manualMarkerId: readString(row, column.manual_marker_id, index),
       excludeFromDrivingAnalysis: readString(row, column.exclude_from_driving_analysis, index).toLowerCase() === "true",
       isEffective: readOptionalBoolean(row, column.is_effective, true),
@@ -161,9 +175,18 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
     rewindClusters,
     rewindSummary: buildRewindSummary(rewindClusters),
     sectionSummaries: buildSectionSummaries(timelinePoints),
+    channelAvailability: buildChannelAvailability(points),
   };
 }
 
+function buildChannelAvailability(points: ProjectedLapPoint[]): ProjectedLapChannelAvailability {
+  return {
+    speed: points.length > 0,
+    throttle: points.some((point) => point.throttlePct !== null),
+    brake: points.some((point) => point.brakePct !== null),
+    steering: points.some((point) => point.steerNorm !== null),
+  };
+}
 function buildSectionSummaries(points: ProjectedLapPoint[]): ProjectedLapSectionSummary[] {
   return SECTION_IDS.map((sectionId) => {
     const sectionPoints = points.filter((point) => point.sectionId === sectionId);

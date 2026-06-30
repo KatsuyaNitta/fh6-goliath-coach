@@ -38,6 +38,7 @@ interface CourseSceneProps {
   showRewinds: boolean;
   selectedRewindClusterId: string;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
+  activeTelemetryPoint?: ProjectedLapPoint | null;
 }
 
 export function CourseScene({
@@ -52,6 +53,7 @@ export function CourseScene({
   showRewinds,
   selectedRewindClusterId,
   onSelectRewindCluster,
+  activeTelemetryPoint,
 }: CourseSceneProps) {
   const baselineDisplayY = reference.coordinate_system.relative_elevation.baseline_display_y;
   const bounds = useMemo(
@@ -94,6 +96,7 @@ export function CourseScene({
         showRewinds={showRewinds}
         selectedRewindClusterId={selectedRewindClusterId}
         onSelectRewindCluster={onSelectRewindCluster}
+        activeTelemetryPoint={activeTelemetryPoint}
       />
       <SceneControls bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
     </Canvas>
@@ -323,6 +326,7 @@ function CourseLines({
   showRewinds,
   selectedRewindClusterId,
   onSelectRewindCluster,
+  activeTelemetryPoint,
 }: {
   reference: ReferencePayload;
   projectedLap?: ProjectedLapPayload | null;
@@ -334,6 +338,7 @@ function CourseLines({
   showRewinds: boolean;
   selectedRewindClusterId: string;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
+  activeTelemetryPoint?: ProjectedLapPoint | null;
 }) {
   const sectionPoints = useMemo(() => {
     const grouped = new Map<SectionId, ReferencePointTuple[]>();
@@ -489,6 +494,32 @@ function CourseLines({
   );
 }
 
+function TelemetryCursorMarker({
+  baselineDisplayY,
+  elevationScale,
+  point,
+}: {
+  baselineDisplayY: number;
+  elevationScale: number;
+  point: ProjectedLapPoint;
+}) {
+  const position = projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY);
+  return (
+    <group position={position}>
+      <mesh>
+        <sphereGeometry args={[155, 24, 24]} />
+        <meshStandardMaterial color="#ffffff" emissive="#22d3ee" emissiveIntensity={0.8} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[230, 18, 12, 36]} />
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.78} />
+      </mesh>
+      <Html distanceFactor={11000} position={[0, 430, 0]} center>
+        <span className="scene-label telemetry-cursor-label">{(point.courseDistanceM / 1000).toFixed(3)} km</span>
+      </Html>
+    </group>
+  );
+}
 function RewindClusterMarker({
   baselineDisplayY,
   cluster,

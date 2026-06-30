@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 from dataclasses import asdict, replace
@@ -8,8 +8,8 @@ from pathlib import Path
 
 from goliath.config.sections import SECTIONS
 from goliath.reference.loader import load_reference_csv
+from goliath.telemetry.attempt import build_lap_selection_from_effective_attempt, select_restart_aware_attempt
 from goliath.telemetry.importer import load_telemetry_session
-from goliath.telemetry.lap import extract_completed_lap
 from goliath.telemetry.markers import detect_handbrake_markers
 from goliath.telemetry.model import ProjectedSample, TelemetryRow
 from goliath.telemetry.projection import project_lap_to_reference, project_single_row_to_reference
@@ -44,20 +44,22 @@ def process_session(
     vehicle_payload = vehicle_identity_payload(vehicle_identity)
     reference_points, origin = load_reference_csv(reference_csv)
 
-    normalization = normalize_rewinds(session.rows)
-    lap = extract_completed_lap(normalization.effective_rows)
+    attempt_selection = select_restart_aware_attempt(session.rows)
+    raw_lap_rows = attempt_selection.selected_attempt.rows
+    normalization = normalize_rewinds(raw_lap_rows)
+    lap = build_lap_selection_from_effective_attempt(
+        normalization.effective_rows,
+        notes=["Selected attempt immediately before the final hard timer reset."],
+    )
     validate_effective_lap_time(lap.rows)
-    raw_lap_rows = [
-        row for row in session.rows
-        if lap.start_source_row_index <= row.source_row_index <= lap.end_source_row_index
-    ]
 
     markers = detect_handbrake_markers(lap.rows)
     projected_effective, projection_summary = project_lap_to_reference(lap.rows, reference_points, origin)
+    _validate_completed_lap_quality(lap, projected_effective, reference_points, len(session.rows))
     projected_effective = _apply_marker_annotations(projected_effective, markers)
     projected_by_row = {sample.row.source_row_index: sample for sample in projected_effective}
 
-    rows_by_source = {row.source_row_index: row for row in session.rows}
+    rows_by_source = {row.source_row_index: row for row in raw_lap_rows}
     for event in normalization.events:
         for source_row_index in (event.pre_rewind_source_row_index, event.target_source_row_index):
             if source_row_index not in projected_by_row and source_row_index in rows_by_source:
@@ -73,7 +75,9 @@ def process_session(
         section_ids=[section.id for section in SECTIONS],
         normalization=normalization,
     )
+    attempt_detection = attempt_selection.diagnostics()
     rewind_analysis["vehicle"] = vehicle_payload
+    rewind_analysis["attempt_detection"] = attempt_detection
 
     projected_for_csv = _build_projected_lap_output_samples(projected_effective, normalization, projected_by_row)
     sections = build_section_summary([sample for sample in projected_effective if sample.is_effective])
@@ -128,6 +132,7 @@ def process_session(
             "incomplete": lap.incomplete,
             "notes": lap.notes,
         },
+        "attempt_detection": attempt_detection,
         "handbrake_marker_count": len(markers),
         "projection_summary": asdict(projection_summary),
         "rewind_summary": rewind_analysis["summary"],
@@ -142,6 +147,72 @@ def process_session(
     }
     _write_json(session_summary_path, summary)
     return summary
+
+
+
+MIN_COMPLETED_LAP_TIME_S = 300.0
+LARGE_RECORDING_ROW_COUNT = 10_000
+MIN_LARGE_RECORDING_EFFECTIVE_ROWS = 1_000
+MIN_LARGE_RECORDING_EFFECTIVE_RATIO = 0.20
+MIN_REFERENCE_COVERAGE_RATIO = 0.85
+START_DISTANCE_TOLERANCE_M = 2_000.0
+FINISH_DISTANCE_TOLERANCE_M = 2_000.0
+MIN_UNIQUE_REFERENCE_RATIO = 0.25
+
+
+def _validate_completed_lap_quality(
+    lap,
+    projected: list[ProjectedSample],
+    reference_points,
+    source_row_count: int,
+) -> None:
+    errors: list[str] = []
+    effective_row_count = len(projected)
+    if lap.incomplete:
+        errors.append("completed lap is marked incomplete")
+    if lap.completed_lap_time_s <= 0:
+        errors.append("completed lap time must be positive")
+    if lap.end_lap_time_s <= lap.start_lap_time_s:
+        errors.append("lap timer did not advance across selected attempt")
+    if lap.completed_lap_time_s < MIN_COMPLETED_LAP_TIME_S:
+        errors.append(f"completed lap duration is too short: {lap.completed_lap_time_s:.3f}s")
+    if effective_row_count == 0:
+        errors.append("projected lap has no effective rows")
+    if source_row_count >= LARGE_RECORDING_ROW_COUNT:
+        if effective_row_count < MIN_LARGE_RECORDING_EFFECTIVE_ROWS:
+            errors.append(f"effective row count is too small for a dense recording: {effective_row_count}")
+        ratio = effective_row_count / max(1, source_row_count)
+        if ratio < MIN_LARGE_RECORDING_EFFECTIVE_RATIO:
+            errors.append(f"selected attempt covers too little of the recording: {ratio:.3f}")
+    if projected and reference_points:
+        reference_length_m = reference_points[-1].course_distance_m
+        distances = [sample.course_distance_m for sample in projected]
+        start_distance = distances[0]
+        end_distance = distances[-1]
+        covered_distance = max(distances) - min(distances)
+        if start_distance > START_DISTANCE_TOLERANCE_M:
+            errors.append(f"selected lap does not start near the reference start: {start_distance:.3f}m")
+        if end_distance < reference_length_m - FINISH_DISTANCE_TOLERANCE_M:
+            errors.append(f"selected lap does not finish near the reference end: {end_distance:.3f}m")
+        if covered_distance < reference_length_m * MIN_REFERENCE_COVERAGE_RATIO:
+            errors.append(f"projected lap covers too little reference distance: {covered_distance:.3f}m")
+        section_ids = [sample.section_id for sample in projected]
+        missing_sections = sorted({section.id for section in SECTIONS} - set(section_ids))
+        if missing_sections:
+            errors.append(f"projected lap is missing sections: {', '.join(missing_sections)}")
+        section_order = {section.id: index for index, section in enumerate(SECTIONS)}
+        previous_order = section_order.get(section_ids[0], 0) if section_ids else 0
+        for section_id in section_ids[1:]:
+            order = section_order.get(section_id, previous_order)
+            if order < previous_order:
+                errors.append("projected section order moves backward unexpectedly")
+                break
+            previous_order = order
+        unique_reference_indices = len({sample.reference_index for sample in projected})
+        if unique_reference_indices < max(1, int(effective_row_count * MIN_UNIQUE_REFERENCE_RATIO)):
+            errors.append("projected lap collapses onto too few reference points")
+    if errors:
+        raise ValueError("invalid completed Goliath lap: " + "; ".join(errors))
 
 
 def _apply_marker_annotations(
@@ -230,6 +301,9 @@ def _write_projected_lap(path: Path, projected: list[ProjectedSample], vehicle: 
         "telemetry_display_y",
         "telemetry_display_z",
         "speed_kmh",
+        "accel_pct",
+        "brake_pct",
+        "steer_norm",
         "manual_marker_id",
         "exclude_from_driving_analysis",
         "is_effective",
@@ -269,6 +343,9 @@ def _write_projected_lap(path: Path, projected: list[ProjectedSample], vehicle: 
                     "telemetry_display_y": sample.telemetry_display_y,
                     "telemetry_display_z": sample.telemetry_display_z,
                     "speed_kmh": sample.row.speed_kmh,
+                    "accel_pct": sample.row.accel_pct,
+                    "brake_pct": sample.row.brake_pct,
+                    "steer_norm": sample.row.steer_norm,
                     "manual_marker_id": sample.marker_id,
                     "exclude_from_driving_analysis": sample.exclude_from_driving_analysis,
                     "is_effective": sample.is_effective,

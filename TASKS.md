@@ -1,4 +1,4 @@
-﻿# TASKS — FH6 Goliath Improvement Program
+# TASKS — FH6 Goliath Improvement Program
 
 ## Status
 
@@ -71,6 +71,7 @@
 - [x] Actual P1-P5 marker display.
 - [x] Selected actual-lap segment highlighting.
 - [x] Sanitized fixtures and end-to-end tests.
+- [x] Restart-aware lap extraction regression tests.
 
 ## Verified B1 Integration Result
 
@@ -86,8 +87,11 @@
 ## Current Known Limitations
 
 - Manual lap-selection UI is not implemented.
+- Recordings without a final finish timer reset are currently unsupported.
+- Multiple completed laps in a single recording are currently unsupported.
+- Ambiguous or incomplete recordings are rejected rather than auto-selected.
 - Replay is not implemented.
-- Telemetry charts are not implemented.
+- Telemetry charts MVP is implemented for Speed, Throttle, Brake, and Steering; advanced channels and corner identification remain incomplete.
 - Driving-quality analysis is not implemented.
 - AI explanations are not implemented.
 - The 2D map view requires a dedicated repair pass.
@@ -239,15 +243,22 @@
 - [x] Load session JSON.
 - [x] Display session metadata.
 - [x] Detect candidate laps.
+- [x] Detect hard timer reset attempt boundaries.
+- [x] Select the attempt immediately before the final hard timer reset.
+- [x] Keep pause and packet gaps inside the current attempt.
 - [ ] Allow manual lap selection.
 - [x] Detect incomplete laps.
 - [x] Extract completed lap.
+- [x] Extract completed laps from recordings that include pre-lap restarts.
 - [x] Separate post-finish samples.
 - [x] Detect five handbrake markers.
 - [x] Apply marker exclusion windows.
 - [x] Detect long pauses.
 - [ ] Detect obvious coordinate jumps.
 - [ ] Flag possible rewind segments.
+- [x] Limit rewind normalization to the selected attempt.
+- [x] Add attempt-detection diagnostics to processed session summaries.
+- [x] Reject invalid short tails and incomplete completed-lap outputs.
 - [x] Add import error messages.
 - [x] Export normalized session metadata.
 - [x] Generate processed output files.
@@ -321,10 +332,10 @@
 
 # 8. Telemetry Charts — P1
 
-- [ ] Speed.
-- [ ] Throttle.
-- [ ] Brake.
-- [ ] Steering.
+- [x] Speed.
+- [x] Throttle.
+- [x] Brake.
+- [x] Steering.
 - [ ] Handbrake.
 - [ ] Gear.
 - [ ] RPM.
@@ -336,18 +347,18 @@
 - [ ] Individual tire slip.
 - [ ] Suspension travel.
 - [ ] Tire temperatures where available.
-- [ ] Synchronized chart cursor.
-- [ ] Section background bands.
-- [ ] P1–P5 marker lines.
+- [x] Synchronized chart cursor.
+- [x] Section background bands.
+- [x] P1-P5 marker lines.
 
 ---
 
 # 9. Course Coloring Modes — P1
 
 - [ ] Section.
-- [ ] Speed.
-- [ ] Throttle.
-- [ ] Brake.
+- [x] Speed.
+- [x] Throttle.
+- [x] Brake.
 - [ ] Steering magnitude.
 - [ ] Lateral G.
 - [ ] Gradient.
@@ -588,8 +599,8 @@ For each corner or analysis zone:
 5. [ ] Add relative-elevation tests.
 6. [ ] Produce a lightweight browser-specific lap dataset.
 7. [ ] Interpolate section-boundary crossing times.
-8. [ ] Repair and separate the 2D orthographic map view.
-9. [ ] Add the first synchronized telemetry chart, starting with speed.
+8. [ ] Add manual review/selection tools for unsupported or ambiguous multi-lap recordings.
+9. [ ] Repair and separate the 2D orthographic map view.
 10. [ ] Begin Milestone C with a vehicle marker and basic replay controls.
 
 ---
