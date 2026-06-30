@@ -6,3 +6,4 @@ await import("./camera-orientation-smoke.mjs");
 await import("./camera-lifecycle-smoke.mjs");
 await import("./rewind-selection-smoke.mjs");
 await import("./telemetry-lap-smoke.mjs");
+await import("./session-api-smoke.mjs");

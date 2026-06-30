@@ -186,7 +186,7 @@ Open the local URL printed by Vite. The app loads:
 /reference/goliath_reference.json
 ```
 
-Use the **Load projected lap** control to select a generated `projected-lap.csv` and overlay the actual driven path.
+Use the **Load CSV manually** control to select a generated `projected-lap.csv` and overlay the actual driven path.
 
 ## Frontend Tests
 
@@ -204,6 +204,65 @@ cd viewer
 pnpm run build
 ```
 
+
+## Local Web Session Browser
+
+The React viewer can still run as a static Vite app, but browser security prevents it from scanning or processing local session folders by itself. The local web service keeps those operations on `127.0.0.1` and exposes only the session list, processing action, and processed projected-lap CSVs.
+
+Build the viewer, then serve the built app and API from the repository root:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach\viewer
+pnpm run build
+
+Set-Location G:\github\fh6-goliath-coach
+$env:PYTHONPATH="$PWD\backend"
+.\.venv\Scripts\python.exe -m goliath.cli serve --open
+```
+
+Development mode keeps Vite separate and proxies `/api` to the Python service:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach
+$env:PYTHONPATH="$PWD\backend"
+.\.venv\Scripts\python.exe -m goliath.cli serve --api-only
+```
+
+In another PowerShell:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach\viewer
+pnpm run dev
+```
+
+The service is loopback-only by default. `localhost`, `127.0.0.1`, and `::1` are accepted. Non-loopback binding requires explicit `--allow-remote`, which is intended only for trusted networks.
+
+Useful endpoints:
+
+```text
+GET  /api/health
+GET  /api/sessions
+POST /api/sessions/<session_id>/process
+GET  /api/sessions/<session_id>/projected-lap
+```
+
+The browser UI never force-processes a session and never processes automatically. Selecting a session only selects it; **Process & Load** explicitly processes an eligible unprocessed session, then loads the generated projected-lap CSV. **Load** fetches an already processed projected-lap CSV. Ignored, incomplete, invalid, and partial sessions are shown as disabled browser actions. Source telemetry CSV, session JSON, and `.fh6raw` files are not served over HTTP.
+
+For read-only smoke testing with a custom processed root:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach
+$env:PYTHONPATH="$PWD\backend"
+.\.venv\Scripts\python.exe -m goliath.cli serve --processed-root data\local\processed-cli-smoke
+```
+
+Then check:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8765/api/health
+Invoke-RestMethod "http://127.0.0.1:8765/api/sessions?include_ignored=true"
+Invoke-WebRequest http://127.0.0.1:8765/api/sessions/20260630_005550/projected-lap -OutFile data\local\api-smoke-projected-lap.csv
+```
 ## Managed Local Sessions
 
 FH6_telemetry can finalize recordings into the local Goliath Coach handoff area:

@@ -19,6 +19,8 @@ from goliath.sessions import (
 from goliath.sessions.model import SESSION_LIST_SCHEMA_VERSION, SessionRecord, SessionUserError
 from goliath.telemetry.processor import process_session
 from goliath.vehicle.catalog import DEFAULT_CATALOG_DIR, DEFAULT_SOURCE_URL, import_vehicle_catalog
+from goliath.web.server import serve
+from goliath.web.app import WebConfig
 
 
 def main() -> None:
@@ -99,6 +101,19 @@ def main() -> None:
     unignore_session.add_argument("--sessions-root", type=Path, default=DEFAULT_SESSIONS_ROOT)
     unignore_session.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
 
+    serve_parser = subparsers.add_parser("serve")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--sessions-root", type=Path, default=DEFAULT_SESSIONS_ROOT)
+    serve_parser.add_argument("--processed-root", type=Path, default=DEFAULT_PROCESSED_ROOT)
+    serve_parser.add_argument("--state-root", type=Path, default=DEFAULT_STATE_ROOT)
+    serve_parser.add_argument("--vehicle-catalog-dir", type=Path, default=DEFAULT_CATALOG_DIR)
+    serve_parser.add_argument("--reference", type=Path, default=Path("data/reference/goliath_reference_1m.csv"))
+    serve_parser.add_argument("--viewer-root", type=Path, default=Path("viewer/dist"))
+    serve_parser.add_argument("--api-only", action="store_true")
+    serve_parser.add_argument("--open", action="store_true")
+    serve_parser.add_argument("--allow-remote", action="store_true")
+
     args = parser.parse_args()
     try:
         if args.command == "build-reference":
@@ -115,6 +130,8 @@ def main() -> None:
             _run_ignore_session(args)
         elif args.command == "unignore-session":
             _run_unignore_session(args)
+        elif args.command == "serve":
+            _run_serve(args)
     except SessionUserError as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(exc.exit_code) from None
@@ -245,6 +262,24 @@ def _run_unignore_session(args: argparse.Namespace) -> None:
     else:
         print(f"session {session_id} was not ignored")
 
+
+def _run_serve(args: argparse.Namespace) -> None:
+    config = WebConfig(
+        sessions_root=args.sessions_root,
+        processed_root=args.processed_root,
+        state_root=args.state_root,
+        vehicle_catalog_dir=args.vehicle_catalog_dir,
+        reference_csv=args.reference,
+        viewer_root=args.viewer_root,
+        api_only=args.api_only,
+    )
+    serve(
+        config,
+        host=args.host,
+        port=args.port,
+        allow_remote=args.allow_remote,
+        open_browser=args.open,
+    )
 
 def _print_processed_summary(summary: dict[str, object]) -> None:
     lap = summary["completed_lap"]  # type: ignore[index]

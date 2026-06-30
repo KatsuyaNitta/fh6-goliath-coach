@@ -3,6 +3,7 @@ import type { ReferencePayload, SectionDefinition, SectionId } from "./lib/refer
 import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
 import { VehicleTunePanel } from "./components/VehicleTunePanel";
+import { SessionBrowserPanel } from "./components/SessionBrowserPanel";
 import { classificationLabel, parseProjectedLapCsv, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { sectionForRewindSelection } from "./lib/rewindSelection";
@@ -17,6 +18,7 @@ export function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
+  const [loadedSessionId, setLoadedSessionId] = useState("");
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [showReference, setShowReference] = useState(true);
   const [showActual, setShowActual] = useState(true);
@@ -92,6 +94,18 @@ export function App() {
     });
   }, [cameraResetKey, projectedLap, reference, viewMode]);
 
+  function applyProjectedLap(parsed: ProjectedLapPayload, loadedSession: string): void {
+    setProjectedLap(parsed);
+    setLoadedSessionId(loadedSession);
+    const firstRewindCluster = parsed.rewindClusters[0];
+    setSelectedRewindClusterId(firstRewindCluster?.clusterId ?? "");
+    setSelectedRewindEventId("");
+    setSelectedSectionId((current) => sectionForRewindSelection(current, firstRewindCluster?.sectionId));
+    setTelemetryError(null);
+    setShowActual(true);
+    setShowRewinds(parsed.rewindClusters.length > 0);
+  }
+
   async function handleProjectedLapFile(file: File | undefined): Promise<void> {
     if (!file) {
       return;
@@ -99,17 +113,11 @@ export function App() {
     try {
       const text = await file.text();
       const parsed = parseProjectedLapCsv(text, file.name);
-      setProjectedLap(parsed);
-      const firstRewindCluster = parsed.rewindClusters[0];
-      setSelectedRewindClusterId(firstRewindCluster?.clusterId ?? "");
-      setSelectedRewindEventId("");
-      setSelectedSectionId((current) => sectionForRewindSelection(current, firstRewindCluster?.sectionId));
-      setTelemetryError(null);
-      setShowActual(true);
-      setShowRewinds(parsed.rewindClusters.length > 0);
+      applyProjectedLap(parsed, parsed.sessionId);
     } catch (caught: unknown) {
       setTelemetryError(caught instanceof Error ? caught.message : "Failed to load projected lap.");
       setProjectedLap(null);
+      setLoadedSessionId("");
     }
   }
 
@@ -169,10 +177,15 @@ export function App() {
           Reset camera
         </button>
 
+        <SessionBrowserPanel
+          loadedSessionId={loadedSessionId}
+          onLoadProjectedLap={(parsed, sessionId) => applyProjectedLap(parsed, sessionId)}
+        />
+
         <section className="telemetry-panel">
           <div className="panel-heading">
             <h2>Telemetry Overlay</h2>
-            <p>Load a processed projected-lap CSV.</p>
+            <p>Load a processed projected-lap CSV manually.</p>
           </div>
           <input
             accept=".csv,text/csv"
@@ -186,7 +199,7 @@ export function App() {
             type="button"
             onClick={() => projectedLapInputRef.current?.click()}
           >
-            Load projected lap
+            Load CSV manually
           </button>
           <div className="toggle-row">
             <label>
