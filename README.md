@@ -203,3 +203,42 @@ The frontend smoke test checks generated reference data, camera transforms, vehi
 cd viewer
 pnpm run build
 ```
+
+## Managed Local Sessions
+
+FH6_telemetry can finalize recordings into the local Goliath Coach handoff area:
+
+```text
+G:\github\fh6-goliath-coach\data\local\sessions\<session_id>\
+```
+
+Goliath Coach treats this folder as read-only source input. Active logger recordings under `data\local\recording` are not discovered, and sessions are never processed automatically.
+
+Useful PowerShell commands:
+
+```powershell
+Set-Location G:\github\fh6-goliath-coach
+$env:PYTHONPATH="$PWD\backend"
+
+.\.venv\Scripts\python.exe -m goliath.cli list-sessions
+.\.venv\Scripts\python.exe -m goliath.cli list-sessions --json
+.\.venv\Scripts\python.exe -m goliath.cli process-session-id 20260630_005550
+.\.venv\Scripts\python.exe -m goliath.cli ignore-session 20260630_200504 --reason "FH6_telemetry save smoke test; not a Goliath run"
+.\.venv\Scripts\python.exe -m goliath.cli unignore-session 20260630_200504
+```
+
+Managed defaults:
+
+```text
+sessions root:      data\local\sessions
+processed root:     data\local\processed
+session state root: data\local\session-state
+vehicle catalog:    data\local\vehicle-catalog
+reference path:     data\reference\goliath_reference_1m.csv
+```
+
+`list-sessions` inspects only direct child directories of `data\local\sessions`. A modern FH6_telemetry session is ready when `recording_complete` is `true` and `recording_state` is `completed`. Older legacy sessions without those fields remain discoverable as `legacy-ready` when they contain exactly one telemetry CSV and one session JSON with the expected CSV headers. Incomplete, invalid, and ignored sessions are hidden unless `--include-incomplete`, `--include-invalid`, or `--include-ignored` is provided.
+
+`process-session-id` is a managed wrapper around the existing path-based `process-session` command. It stages output under `data\local\processed\.staging`, validates the generated session summary and required projected/rewind outputs, then moves the result into `data\local\processed\<session_id>`. It refuses ignored, incomplete, invalid, partial, or already processed sessions unless the documented `--force` path is used. Source session folders are not moved, modified, or deleted.
+
+Ignore state is local user intent stored separately under `data\local\session-state\<session_id>.json`; it does not modify FH6_telemetry session JSON. `data\local\` is Git-ignored, so raw sessions, processed managed output, and ignore-state files are not tracked.

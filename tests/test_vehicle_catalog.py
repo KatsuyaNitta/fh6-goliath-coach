@@ -6,7 +6,6 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from goliath.telemetry.importer import load_telemetry_session
 from goliath.telemetry.processor import process_session
 from goliath.vehicle.catalog import import_vehicle_catalog, normalize_source_catalog, parse_ordinal, safe_slug
 from goliath.vehicle.resolver import resolve_vehicle_identity, summarize_session_vehicle
