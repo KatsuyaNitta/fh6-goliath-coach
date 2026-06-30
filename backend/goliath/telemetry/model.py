@@ -37,6 +37,12 @@ class TelemetryRow:
     accel_pct: float = 0.0
     brake_pct: float = 0.0
     steer_norm: float = 0.0
+    car_ordinal: int | None = None
+    car_class: int | None = None
+    car_performance_index: int | None = None
+    drive_train: int | None = None
+    num_cylinders: int | None = None
+    car_group: int | None = None
 
     @property
     def handbrake_active(self) -> bool:
@@ -54,6 +60,17 @@ class SampleStats:
 
 
 @dataclass(frozen=True)
+class TelemetrySessionVehicle:
+    car_ordinal: int | None
+    car_class: int | None
+    car_performance_index: int | None
+    drive_train: int | None
+    car_group: int | None
+    num_cylinders: int | None
+    ordinal_distribution: dict[str, int]
+
+
+@dataclass(frozen=True)
 class TelemetrySession:
     session_id: str
     csv_path: str
@@ -62,6 +79,7 @@ class TelemetrySession:
     session_metadata: dict[str, object]
     rows: list[TelemetryRow]
     sample_stats: SampleStats
+    vehicle: TelemetrySessionVehicle
 
 
 @dataclass(frozen=True)

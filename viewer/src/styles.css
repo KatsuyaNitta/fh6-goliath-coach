@@ -498,3 +498,16 @@ textarea {
   margin-top: 8px;
   color: #a9b8c7;
 }
+.telemetry-summary dd {
+  overflow-wrap: anywhere;
+}
+
+.telemetry-summary .vehicle-name {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.telemetry-summary .file-name {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}

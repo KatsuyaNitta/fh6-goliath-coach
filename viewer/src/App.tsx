@@ -217,14 +217,26 @@ export function App() {
             Rewinds
           </label>
           {projectedLap ? (
-            <dl className="compact-stats">
+            <dl className="compact-stats telemetry-summary">
+              <div>
+                <dt>Vehicle</dt>
+                <dd className="vehicle-name">{projectedLap.vehicle.displayName}</dd>
+              </div>
+              <div>
+                <dt>Session</dt>
+                <dd>{projectedLap.sessionId || "Unknown"}</dd>
+              </div>
               <div>
                 <dt>File</dt>
-                <dd>{projectedLap.fileName}</dd>
+                <dd className="file-name">{projectedLap.fileName}</dd>
               </div>
               <div>
                 <dt>Lap time</dt>
                 <dd>{formatSeconds(projectedLap.totalLapTimeS)}</dd>
+              </div>
+              <div>
+                <dt>Rewinds</dt>
+                <dd>{projectedLap.rewindSummary.rewindCount}</dd>
               </div>
               <div>
                 <dt>Markers</dt>

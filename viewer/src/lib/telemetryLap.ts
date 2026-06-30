@@ -4,6 +4,14 @@ export type RewindClassification = "external_impact_suspected" | "driving_error_
 export type RewindConfidence = "high" | "medium" | "low" | "";
 export type RewindImpactDirection = "rear" | "front" | "left" | "right" | "unknown" | "";
 
+export interface ProjectedLapVehicle {
+  displayName: string;
+  filenameSlug: string;
+  carOrdinal?: number;
+  identificationSource: string;
+  catalogSha256?: string;
+}
+
 export interface ProjectedLapPoint {
   sourceRowIndex: number;
   timestampS: number;
@@ -63,6 +71,8 @@ export interface RewindSummaryPayload {
 
 export interface ProjectedLapPayload {
   fileName: string;
+  sessionId: string;
+  vehicle: ProjectedLapVehicle;
   totalLapTimeS: number;
   points: ProjectedLapPoint[];
   effectivePoints: ProjectedLapPoint[];
@@ -132,6 +142,7 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
     };
   });
 
+  const vehicle = readVehicleMetadata(rows.slice(1), column);
   const effectivePoints = points.filter((point) => point.isEffective);
   const timelinePoints = effectivePoints.length > 0 ? effectivePoints : points;
   const first = timelinePoints[0];
@@ -140,6 +151,8 @@ export function parseProjectedLapCsv(text: string, fileName = "projected-lap.csv
   const rewindClusters = buildRewindClusters(rewindEvents);
   return {
     fileName,
+    sessionId: sessionIdFromFileName(fileName),
+    vehicle,
     totalLapTimeS: last.lapTimeS - first.lapTimeS,
     points,
     effectivePoints,
@@ -218,6 +231,50 @@ function buildRewindSummary(clusters: RewindClusterPayload[]): RewindSummaryPayl
     bySection,
     practiceFocus,
   };
+}
+
+function readVehicleMetadata(rows: string[][], column: Record<string, number>): ProjectedLapVehicle {
+  const displayName = firstNonEmpty(rows, column.vehicle_display_name);
+  const filenameSlug = firstNonEmpty(rows, column.vehicle_filename_slug);
+  const identificationSource = firstNonEmpty(rows, column.vehicle_identification_source);
+  const catalogSha256 = firstNonEmpty(rows, column.vehicle_catalog_sha256);
+  const carOrdinal = firstOptionalNumber(rows, column.vehicle_car_ordinal);
+  const fallbackDisplayName = carOrdinal === undefined ? "Unknown vehicle" : `Car ${carOrdinal}`;
+  const fallbackSlug = carOrdinal === undefined ? "unknown-vehicle" : `car-${carOrdinal}`;
+  return {
+    displayName: displayName || fallbackDisplayName,
+    filenameSlug: filenameSlug || fallbackSlug,
+    carOrdinal,
+    identificationSource: identificationSource || (carOrdinal === undefined ? "unknown" : "ordinal_fallback"),
+    catalogSha256: catalogSha256 || undefined,
+  };
+}
+
+function firstNonEmpty(rows: string[][], columnIndex: number | undefined): string {
+  if (columnIndex === undefined) {
+    return "";
+  }
+  for (const row of rows) {
+    const value = row[columnIndex]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function firstOptionalNumber(rows: string[][], columnIndex: number | undefined): number | undefined {
+  const raw = firstNonEmpty(rows, columnIndex);
+  if (!raw) {
+    return undefined;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function sessionIdFromFileName(fileName: string): string {
+  const match = fileName.match(/^(\d{8}_\d{6})_/);
+  return match?.[1] ?? "";
 }
 
 export function classificationLabel(classification: RewindClassification): string {

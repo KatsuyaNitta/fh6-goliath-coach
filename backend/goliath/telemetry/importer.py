@@ -7,6 +7,7 @@ from pathlib import Path
 from statistics import median
 
 from goliath.telemetry.model import SampleStats, TelemetryRow, TelemetrySession
+from goliath.vehicle.resolver import summarize_session_vehicle
 
 REQUIRED_COLUMNS = (
     "game_elapsed_s",
@@ -43,6 +44,12 @@ OPTIONAL_NUMERIC_COLUMNS = (
     "accel_pct",
     "brake_pct",
     "steer_norm",
+    "car_ordinal",
+    "car_class",
+    "car_performance_index",
+    "drive_train",
+    "num_cylinders",
+    "car_group",
 )
 
 
@@ -84,6 +91,7 @@ def load_telemetry_session(session_dir: Path) -> TelemetrySession:
         session_metadata=session_metadata,
         rows=rows,
         sample_stats=_build_sample_stats(rows),
+        vehicle=summarize_session_vehicle(rows),
     )
 
 
@@ -138,7 +146,18 @@ def _parse_row(row: dict[str, str], source_row_index: int) -> TelemetryRow:
         accel_pct=optional["accel_pct"],
         brake_pct=optional["brake_pct"],
         steer_norm=optional["steer_norm"],
+        car_ordinal=_optional_int(optional["car_ordinal"]),
+        car_class=_optional_int(optional["car_class"]),
+        car_performance_index=_optional_int(optional["car_performance_index"]),
+        drive_train=_optional_int(optional["drive_train"]),
+        num_cylinders=_optional_int(optional["num_cylinders"]),
+        car_group=_optional_int(optional["car_group"]),
     )
+
+
+def _optional_int(value: float) -> int | None:
+    integer = int(value)
+    return integer if integer > 0 else None
 
 
 def _parse_required_float(row: dict[str, str], column: str, source_row_index: int) -> float:

@@ -25,6 +25,7 @@ from goliath.telemetry.summary import (
     build_section_summary,
     markers_as_dicts,
 )
+from goliath.vehicle.resolver import resolve_vehicle_identity, vehicle_identity_payload
 
 
 def process_session(
@@ -32,8 +33,15 @@ def process_session(
     *,
     reference_csv: Path = Path("data/reference/goliath_reference_1m.csv"),
     output_root: Path = Path("data/processed"),
+    vehicle_catalog_dir: Path = Path("data/local/vehicle-catalog"),
 ) -> dict[str, object]:
     session = load_telemetry_session(session_dir)
+    vehicle_identity = resolve_vehicle_identity(
+        session.vehicle,
+        session_metadata=session.session_metadata,
+        catalog_dir=vehicle_catalog_dir,
+    )
+    vehicle_payload = vehicle_identity_payload(vehicle_identity)
     reference_points, origin = load_reference_csv(reference_csv)
 
     normalization = normalize_rewinds(session.rows)
@@ -65,6 +73,7 @@ def process_session(
         section_ids=[section.id for section in SECTIONS],
         normalization=normalization,
     )
+    rewind_analysis["vehicle"] = vehicle_payload
 
     projected_for_csv = _build_projected_lap_output_samples(projected_effective, normalization, projected_by_row)
     sections = build_section_summary([sample for sample in projected_effective if sample.is_effective])
@@ -72,15 +81,23 @@ def process_session(
 
     output_dir = output_root / session.session_id
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_prefix = f"{session.session_id}_{vehicle_identity.filename_slug}"
+    completed_lap_path = output_dir / f"{output_prefix}_completed-lap.csv"
+    projected_lap_path = output_dir / f"{output_prefix}_projected-lap.csv"
+    marker_events_path = output_dir / f"{output_prefix}_marker-events.json"
+    rewind_analysis_path = output_dir / f"{output_prefix}_rewind-analysis.json"
+    section_summary_path = output_dir / f"{output_prefix}_section-summary.json"
+    session_summary_path = output_dir / f"{output_prefix}_session-summary.json"
 
-    _write_completed_lap(output_dir / "completed-lap.csv", session.source_columns, raw_lap_rows, normalization)
-    _write_projected_lap(output_dir / "projected-lap.csv", projected_for_csv)
-    _write_json(output_dir / "marker-events.json", {"markers": markers_as_dicts(markers)})
-    _write_json(output_dir / "rewind-analysis.json", rewind_analysis)
+    _write_completed_lap(completed_lap_path, session.source_columns, raw_lap_rows, normalization)
+    _write_projected_lap(projected_lap_path, projected_for_csv, vehicle_payload)
+    _write_json(marker_events_path, {"markers": markers_as_dicts(markers)})
+    _write_json(rewind_analysis_path, rewind_analysis)
     _write_json(
-        output_dir / "section-summary.json",
+        section_summary_path,
         {
             "session_id": session.session_id,
+            "vehicle": vehicle_payload,
             "total_lap_time_s": lap.completed_lap_time_s,
             "sections": sections,
             "marker_boundary_offsets": marker_offsets,
@@ -91,6 +108,7 @@ def process_session(
         "schema_version": "goliath-processed-session-v1",
         "generated_at": datetime.now(UTC).isoformat(),
         "session_id": session.session_id,
+        "vehicle": vehicle_payload,
         "source": {
             "csv_path": session.csv_path,
             "session_json_path": session.session_json_path,
@@ -114,15 +132,15 @@ def process_session(
         "projection_summary": asdict(projection_summary),
         "rewind_summary": rewind_analysis["summary"],
         "outputs": {
-            "session_summary_json": str(output_dir / "session-summary.json"),
-            "completed_lap_csv": str(output_dir / "completed-lap.csv"),
-            "marker_events_json": str(output_dir / "marker-events.json"),
-            "projected_lap_csv": str(output_dir / "projected-lap.csv"),
-            "rewind_analysis_json": str(output_dir / "rewind-analysis.json"),
-            "section_summary_json": str(output_dir / "section-summary.json"),
+            "session_summary_json": str(session_summary_path),
+            "completed_lap_csv": str(completed_lap_path),
+            "marker_events_json": str(marker_events_path),
+            "projected_lap_csv": str(projected_lap_path),
+            "rewind_analysis_json": str(rewind_analysis_path),
+            "section_summary_json": str(section_summary_path),
         },
     }
-    _write_json(output_dir / "session-summary.json", summary)
+    _write_json(session_summary_path, summary)
     return summary
 
 
@@ -195,7 +213,7 @@ def _write_completed_lap(path: Path, source_columns: list[str], rows: list[Telem
             )
 
 
-def _write_projected_lap(path: Path, projected: list[ProjectedSample]) -> None:
+def _write_projected_lap(path: Path, projected: list[ProjectedSample], vehicle: dict[str, object]) -> None:
     fieldnames = [
         "source_row_index",
         "timestamp_s",
@@ -223,11 +241,17 @@ def _write_projected_lap(path: Path, projected: list[ProjectedSample]) -> None:
         "rewind_impact_direction",
         "rewound_time_s",
         "rewound_course_distance_m",
+        "vehicle_display_name",
+        "vehicle_filename_slug",
+        "vehicle_car_ordinal",
+        "vehicle_identification_source",
+        "vehicle_catalog_sha256",
     ]
     with path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        for sample in projected:
+        for index, sample in enumerate(projected):
+            first_row_vehicle = vehicle if index == 0 else {}
             writer.writerow(
                 {
                     "source_row_index": sample.row.source_row_index,
@@ -256,6 +280,11 @@ def _write_projected_lap(path: Path, projected: list[ProjectedSample]) -> None:
                     "rewind_impact_direction": sample.rewind_impact_direction,
                     "rewound_time_s": "" if sample.rewound_time_s is None else sample.rewound_time_s,
                     "rewound_course_distance_m": "" if sample.rewound_course_distance_m is None else sample.rewound_course_distance_m,
+                    "vehicle_display_name": first_row_vehicle.get("display_name", ""),
+                    "vehicle_filename_slug": first_row_vehicle.get("filename_slug", ""),
+                    "vehicle_car_ordinal": first_row_vehicle.get("car_ordinal", ""),
+                    "vehicle_identification_source": first_row_vehicle.get("identification_source", ""),
+                    "vehicle_catalog_sha256": first_row_vehicle.get("catalog_sha256", ""),
                 }
             )
 
