@@ -158,14 +158,18 @@ Large processed outputs are generated locally and ignored by Git.
 Current processing is restart-aware:
 
 - Hard timer resets split the raw recording into attempt candidates.
-- The selected attempt is the attempt immediately before the final hard timer reset.
-- Rewind normalization runs only inside the selected attempt.
+- The final session-end range is retained as a session-end candidate.
+- Rewind normalization runs independently inside each attempt candidate.
+- Plausible candidates are projected and evaluated with full-lap validation.
+- Exactly one unique valid candidate is selected.
+- A valid session-end candidate may be accepted when no finish reset follows that completed lap.
 - Restart boundaries and the final finish reset are not counted as ordinary rewinds.
-- Recordings without a final finish reset are currently unsupported.
-- Recordings with multiple completed laps are currently unsupported.
+- Recordings with no detectable hard timer reset remain unsupported.
+- Zero valid candidates are rejected with diagnostics.
+- Multiple valid candidates, including multiple completed laps, are rejected as ambiguous.
 - Ambiguous or incomplete recordings are rejected instead of producing a misleading lap.
 
-This keeps post-finish zero-time tails from replacing the actual completed lap.
+This keeps invalid short post-finish tails from replacing the actual completed lap.
 ## Backend Tests
 
 ```powershell

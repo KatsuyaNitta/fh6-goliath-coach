@@ -1,14 +1,19 @@
 ﻿from __future__ import annotations
 
 import csv
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 import json
 from pathlib import Path
 
 from goliath.config.sections import SECTIONS
 from goliath.reference.loader import load_reference_csv
-from goliath.telemetry.attempt import build_lap_selection_from_effective_attempt, select_restart_aware_attempt
+from goliath.telemetry.attempt import (
+    AttemptCandidate,
+    AttemptValidation,
+    build_lap_selection_from_effective_attempt,
+    select_restart_aware_attempt,
+)
 from goliath.telemetry.importer import load_telemetry_session
 from goliath.telemetry.markers import detect_handbrake_markers
 from goliath.telemetry.model import ProjectedSample, TelemetryRow
@@ -44,18 +49,30 @@ def process_session(
     vehicle_payload = vehicle_identity_payload(vehicle_identity)
     reference_points, origin = load_reference_csv(reference_csv)
 
-    attempt_selection = select_restart_aware_attempt(session.rows)
+    evaluation_by_attempt: dict[int, _AttemptEvaluation] = {}
+
+    def validate_attempt(attempt: AttemptCandidate) -> AttemptValidation:
+        evaluation = _evaluate_attempt_candidate(
+            attempt,
+            reference_points=reference_points,
+            origin=origin,
+            source_row_count=len(session.rows),
+        )
+        evaluation_by_attempt[attempt.index] = evaluation
+        return AttemptValidation(valid=evaluation.valid, reason=evaluation.reason, summary=evaluation.summary)
+
+    attempt_selection = select_restart_aware_attempt(session.rows, validator=validate_attempt)
+    selected_evaluation = evaluation_by_attempt[attempt_selection.selected_attempt_index]
     raw_lap_rows = attempt_selection.selected_attempt.rows
-    normalization = normalize_rewinds(raw_lap_rows)
-    lap = build_lap_selection_from_effective_attempt(
-        normalization.effective_rows,
-        notes=["Selected attempt immediately before the final hard timer reset."],
+    normalization = selected_evaluation.normalization
+    lap = replace(
+        selected_evaluation.lap,
+        notes=["Selected the only restart candidate that passed full-lap validation."],
     )
-    validate_effective_lap_time(lap.rows)
 
     markers = detect_handbrake_markers(lap.rows)
-    projected_effective, projection_summary = project_lap_to_reference(lap.rows, reference_points, origin)
-    _validate_completed_lap_quality(lap, projected_effective, reference_points, len(session.rows))
+    projected_effective = selected_evaluation.projected_effective
+    projection_summary = selected_evaluation.projection_summary
     projected_effective = _apply_marker_annotations(projected_effective, markers)
     projected_by_row = {sample.row.source_row_index: sample for sample in projected_effective}
 
@@ -147,6 +164,94 @@ def process_session(
     }
     _write_json(session_summary_path, summary)
     return summary
+
+
+@dataclass(frozen=True)
+class _AttemptEvaluation:
+    normalization: object | None
+    lap: object | None
+    projected_effective: list[ProjectedSample]
+    projection_summary: object | None
+    valid: bool
+    reason: str
+    summary: dict[str, object]
+
+
+def _evaluate_attempt_candidate(
+    attempt: AttemptCandidate,
+    *,
+    reference_points,
+    origin,
+    source_row_count: int,
+) -> _AttemptEvaluation:
+    try:
+        normalization = normalize_rewinds(attempt.rows)
+        lap = build_lap_selection_from_effective_attempt(normalization.effective_rows)
+        validate_effective_lap_time(lap.rows)
+        projected_effective, projection_summary = project_lap_to_reference(lap.rows, reference_points, origin)
+        summary = _attempt_validation_summary(lap, projected_effective, reference_points, source_row_count, normalization)
+        try:
+            _validate_completed_lap_quality(lap, projected_effective, reference_points, source_row_count)
+        except ValueError as exc:
+            return _AttemptEvaluation(
+                normalization=normalization,
+                lap=lap,
+                projected_effective=projected_effective,
+                projection_summary=projection_summary,
+                valid=False,
+                reason=str(exc),
+                summary={**summary, "valid": False, "reason": str(exc)},
+            )
+        return _AttemptEvaluation(
+            normalization=normalization,
+            lap=lap,
+            projected_effective=projected_effective,
+            projection_summary=projection_summary,
+            valid=True,
+            reason="passes full-lap validation",
+            summary=summary,
+        )
+    except ValueError as exc:
+        return _AttemptEvaluation(
+            normalization=None,
+            lap=None,
+            projected_effective=[],
+            projection_summary=None,
+            valid=False,
+            reason=str(exc),
+            summary={
+                "valid": False,
+                "effective_row_count": 0,
+                "reason": str(exc),
+            },
+        )
+
+
+def _attempt_validation_summary(
+    lap,
+    projected: list[ProjectedSample],
+    reference_points,
+    source_row_count: int,
+    normalization,
+) -> dict[str, object]:
+    distances = [sample.course_distance_m for sample in projected]
+    section_ids = {sample.section_id for sample in projected}
+    reference_length_m = reference_points[-1].course_distance_m if reference_points else 0.0
+    covered_distance_m = max(distances) - min(distances) if distances else 0.0
+    return {
+        "valid": True,
+        "effective_row_count": len(projected),
+        "effective_row_ratio": len(projected) / max(1, source_row_count),
+        "completed_lap_time_s": lap.completed_lap_time_s,
+        "start_distance_m": distances[0] if distances else None,
+        "end_distance_m": distances[-1] if distances else None,
+        "covered_distance_m": covered_distance_m,
+        "reference_length_m": reference_length_m,
+        "reference_coverage_ratio": covered_distance_m / reference_length_m if reference_length_m else 0.0,
+        "section_ids": sorted(section_ids),
+        "missing_section_ids": sorted({section.id for section in SECTIONS} - section_ids),
+        "rewind_event_count": len(normalization.events),
+    }
 
 
 

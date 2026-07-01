@@ -87,8 +87,8 @@
 ## Current Known Limitations
 
 - Manual lap-selection UI is not implemented.
-- Recordings without a final finish timer reset are currently unsupported.
-- Multiple completed laps in a single recording are currently unsupported.
+- Recordings with no detectable hard timer reset are currently unsupported.
+- Recordings containing multiple candidates that independently pass full-lap validation are rejected as ambiguous.
 - Ambiguous or incomplete recordings are rejected rather than auto-selected.
 - Replay is not implemented.
 - Telemetry charts MVP is implemented for Speed, Throttle, Brake, and Steering; advanced channels and corner identification remain incomplete.
@@ -245,7 +245,12 @@
 - [x] Display session metadata.
 - [x] Detect candidate laps.
 - [x] Detect hard timer reset attempt boundaries.
-- [x] Select the attempt immediately before the final hard timer reset.
+- [x] Evaluate all attempt candidates and select the unique candidate that passes full-lap validation.
+- [x] Evaluate a final session-end range as an attempt candidate.
+- [x] Reject short post-finish tails even when another hard timer reset follows.
+- [x] Accept a unique valid full-lap session-end candidate.
+- [x] Reject multiple valid full-lap candidates as ambiguous.
+- [x] Reject recordings when no candidate passes full-lap validation.
 - [x] Keep pause and packet gaps inside the current attempt.
 - [ ] Allow manual lap selection.
 - [x] Detect incomplete laps.
@@ -260,6 +265,7 @@
 - [x] Limit rewind normalization to the selected attempt.
 - [x] Add attempt-detection diagnostics to processed session summaries.
 - [x] Reject invalid short tails and incomplete completed-lap outputs.
+- [x] Add restart-aware regression coverage for short post-finish tails, extra tail resets, valid session-end candidates, ambiguous multiple valid candidates, no valid candidates, pre-lap restarts, and selected-attempt rewind handling.
 - [x] Add import error messages.
 - [x] Export normalized session metadata.
 - [x] Generate processed output files.

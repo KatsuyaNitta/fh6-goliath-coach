@@ -3,7 +3,12 @@
 from types import SimpleNamespace
 import unittest
 
-from goliath.telemetry.attempt import detect_hard_timer_resets, select_restart_aware_attempt
+from goliath.telemetry.attempt import (
+    AttemptCandidate,
+    AttemptValidation,
+    detect_hard_timer_resets,
+    select_restart_aware_attempt,
+)
 from goliath.telemetry.model import ProjectedSample, TelemetryRow
 from goliath.telemetry.processor import _validate_completed_lap_quality
 from goliath.telemetry.rewind import normalize_rewinds
@@ -42,6 +47,98 @@ def projected_sample(index: int, lap_time: float, distance_m: float, section_id:
 
 
 class RestartAwareLapExtractionTests(unittest.TestCase):
+    def test_validated_selection_ignores_short_tail_after_finish_reset_and_extra_tail_reset(self) -> None:
+        rows = [
+            row(2, 0.0),
+            row(3, 4.5),
+            row(4, 0.0),
+            row(5, 0.1),
+            row(6, 500.0),
+            row(7, 1000.0),
+            row(8, 1500.0),
+            row(9, 0.0, race_time=1510.0),
+            row(10, 0.1, race_time=1510.1),
+            row(11, 4.2, race_time=1514.2),
+            row(12, 0.0, race_time=1514.3),
+            row(13, 0.1, race_time=1514.4),
+        ]
+
+        def validator(attempt: AttemptCandidate) -> AttemptValidation:
+            valid = attempt.duration_s > 1000.0 and len(attempt.rows) >= 4
+            return AttemptValidation(
+                valid=valid,
+                reason="synthetic full lap" if valid else "synthetic short or abandoned attempt",
+                summary={"duration_s": attempt.duration_s, "row_count": len(attempt.rows)},
+            )
+
+        selection = select_restart_aware_attempt(rows, validator=validator)
+
+        self.assertEqual(len(selection.hard_resets), 3)
+        self.assertEqual(selection.selection_reason, "validated_full_lap_candidate")
+        self.assertEqual(selection.selected_attempt.start_source_row_index, 4)
+        self.assertEqual(selection.selected_attempt.end_source_row_index, 8)
+        self.assertEqual(selection.selected_attempt.end_reason, "hard_timer_reset")
+        self.assertEqual([attempt.selected for attempt in selection.attempts], [False, True, False, False])
+        self.assertEqual(selection.attempts[2].rejection_reason, "synthetic short or abandoned attempt")
+        self.assertAlmostEqual(selection.attempts[2].validation_summary["duration_s"], 4.2)
+
+    def test_validated_selection_preserves_pre_lap_restart_and_rewinds_inside_selected_attempt(self) -> None:
+        rows = [
+            row(2, 0.0),
+            row(3, 5.0),
+            row(4, 0.0),
+            row(5, 0.1),
+            row(6, 500.0),
+            row(7, 800.0),
+            row(8, 790.0),
+            row(9, 1000.0),
+            row(10, 1500.0),
+            row(11, 0.0, race_time=1510.0),
+            row(12, 0.1, race_time=1510.1),
+        ]
+
+        def validator(attempt: AttemptCandidate) -> AttemptValidation:
+            valid = attempt.start_lap_time_s <= 0.1 and attempt.duration_s > 1000.0
+            return AttemptValidation(valid=valid, reason="valid" if valid else "invalid")
+
+        selection = select_restart_aware_attempt(rows, validator=validator)
+        normalization = normalize_rewinds(selection.selected_attempt.rows)
+
+        self.assertEqual(selection.selected_attempt.start_source_row_index, 4)
+        self.assertEqual(selection.selected_attempt.end_source_row_index, 10)
+        self.assertEqual([event.pre_rewind_source_row_index for event in normalization.events], [7])
+        self.assertNotIn(3, normalization.superseded_by_source_row)
+        self.assertNotIn(11, normalization.superseded_by_source_row)
+
+    def test_multiple_valid_completed_lap_candidates_are_rejected_as_ambiguous(self) -> None:
+        rows = [
+            row(2, 0.0),
+            row(3, 1500.0),
+            row(4, 0.0),
+            row(5, 0.1),
+            row(6, 1500.0),
+            row(7, 0.0),
+            row(8, 0.1),
+        ]
+
+        def validator(attempt: AttemptCandidate) -> AttemptValidation:
+            valid = attempt.duration_s > 1000.0
+            return AttemptValidation(valid=valid, reason="valid" if valid else "invalid")
+
+        with self.assertRaisesRegex(ValueError, "ambiguous completed Goliath lap candidates: 0, 1"):
+            select_restart_aware_attempt(rows, validator=validator)
+
+    def test_no_valid_completed_lap_candidate_is_rejected_with_diagnostics(self) -> None:
+        rows = [
+            row(2, 0.0),
+            row(3, 5.0),
+            row(4, 0.0),
+            row(5, 0.1),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "no valid completed Goliath lap candidate; attempt 0: too short"):
+            select_restart_aware_attempt(rows, validator=lambda _attempt: AttemptValidation(False, "too short"))
+
     def test_restart_near_start_selects_attempt_before_finish_reset_and_keeps_internal_rewinds(self) -> None:
         rows = [
             row(2, 0.0),

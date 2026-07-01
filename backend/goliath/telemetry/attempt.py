@@ -2,7 +2,7 @@
 
 from dataclasses import asdict, dataclass
 import math
-from typing import Literal
+from typing import Callable, Literal
 
 from goliath.telemetry.model import LapSelection, TelemetryRow
 
@@ -37,6 +37,14 @@ class AttemptCandidate:
     end_reason: HardResetEndReason
     selected: bool = False
     rejection_reason: str = ""
+    validation_summary: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class AttemptValidation:
+    valid: bool
+    reason: str
+    summary: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -65,13 +73,21 @@ class AttemptSelection:
                     "end_reason": attempt.end_reason,
                     "selected": attempt.selected,
                     "rejection_reason": attempt.rejection_reason,
+                    "validation_summary": attempt.validation_summary or {},
                 }
                 for attempt in self.attempts
             ],
         }
 
 
-def select_restart_aware_attempt(rows: list[TelemetryRow]) -> AttemptSelection:
+AttemptValidator = Callable[[AttemptCandidate], AttemptValidation]
+
+
+def select_restart_aware_attempt(
+    rows: list[TelemetryRow],
+    *,
+    validator: AttemptValidator | None = None,
+) -> AttemptSelection:
     if not rows:
         raise ValueError("cannot select an attempt from an empty telemetry session")
 
@@ -80,6 +96,9 @@ def select_restart_aware_attempt(rows: list[TelemetryRow]) -> AttemptSelection:
         raise ValueError("unsupported recording: no final hard timer reset was detected")
 
     attempts = split_attempts(rows, hard_resets)
+    if validator is not None:
+        return _select_validated_attempt(hard_resets, attempts, validator)
+
     selected_index = len(hard_resets) - 1
     if selected_index >= len(attempts):
         raise ValueError("unsupported recording: final hard timer reset did not leave a preceding attempt")
@@ -200,6 +219,7 @@ def _replace_attempt(
     *,
     selected: bool,
     rejection_reason: str,
+    validation_summary: dict[str, object] | None = None,
 ) -> AttemptCandidate:
     return AttemptCandidate(
         index=attempt.index,
@@ -212,4 +232,50 @@ def _replace_attempt(
         end_reason=attempt.end_reason,
         selected=selected,
         rejection_reason=rejection_reason,
+        validation_summary=validation_summary,
+    )
+
+
+def _select_validated_attempt(
+    hard_resets: list[HardTimerResetBoundary],
+    attempts: list[AttemptCandidate],
+    validator: AttemptValidator,
+) -> AttemptSelection:
+    validations: dict[int, AttemptValidation] = {}
+    valid_attempts: list[AttemptCandidate] = []
+    for attempt in attempts:
+        validation = validator(attempt)
+        validations[attempt.index] = validation
+        if validation.valid:
+            valid_attempts.append(attempt)
+
+    if not valid_attempts:
+        reasons = "; ".join(
+            f"attempt {attempt.index}: {validations[attempt.index].reason}" for attempt in attempts
+        )
+        raise ValueError("unsupported recording: no valid completed Goliath lap candidate; " + reasons)
+    if len(valid_attempts) > 1:
+        indexes = ", ".join(str(attempt.index) for attempt in valid_attempts)
+        raise ValueError(f"ambiguous completed Goliath lap candidates: {indexes}")
+
+    selected = valid_attempts[0]
+    marked_attempts: list[AttemptCandidate] = []
+    for attempt in attempts:
+        validation = validations[attempt.index]
+        marked_attempts.append(
+            _replace_attempt(
+                attempt,
+                selected=attempt.index == selected.index,
+                rejection_reason="" if attempt.index == selected.index else validation.reason,
+                validation_summary=validation.summary,
+            )
+        )
+
+    selected_marked = next(attempt for attempt in marked_attempts if attempt.index == selected.index)
+    return AttemptSelection(
+        hard_resets=hard_resets,
+        attempts=marked_attempts,
+        selected_attempt=selected_marked,
+        selected_attempt_index=selected_marked.index,
+        selection_reason="validated_full_lap_candidate",
     )
