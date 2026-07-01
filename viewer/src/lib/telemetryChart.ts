@@ -12,6 +12,15 @@ export interface TelemetryChannelConfig {
   fixedDomain?: [number, number];
 }
 
+export interface TelemetryTrackLayoutConfig {
+  height: number;
+  showDistanceLabels: boolean;
+  showSectionLabels: boolean;
+  showMarkerLabels: boolean;
+  showRewindLabels: boolean;
+  showGuideLines: boolean;
+}
+
 export interface TelemetryChartRange {
   startM: number;
   endM: number;
@@ -29,6 +38,41 @@ export const TELEMETRY_CHANNELS: TelemetryChannelConfig[] = [
   { id: "brake", label: "Brake", unit: "%", description: "Source brake_pct", fixedDomain: [0, 100] },
   { id: "steering", label: "Steering", unit: "normalized", description: "Normalized input (-1 to +1)", fixedDomain: [-1, 1] },
 ];
+
+export const TELEMETRY_TRACK_LAYOUTS: Record<TelemetryChannelId, TelemetryTrackLayoutConfig> = {
+  speed: {
+    height: 92,
+    showDistanceLabels: false,
+    showSectionLabels: false,
+    showMarkerLabels: true,
+    showRewindLabels: true,
+    showGuideLines: true,
+  },
+  throttle: {
+    height: 76,
+    showDistanceLabels: false,
+    showSectionLabels: false,
+    showMarkerLabels: false,
+    showRewindLabels: false,
+    showGuideLines: true,
+  },
+  brake: {
+    height: 76,
+    showDistanceLabels: false,
+    showSectionLabels: false,
+    showMarkerLabels: false,
+    showRewindLabels: false,
+    showGuideLines: true,
+  },
+  steering: {
+    height: 76,
+    showDistanceLabels: true,
+    showSectionLabels: true,
+    showMarkerLabels: false,
+    showRewindLabels: false,
+    showGuideLines: true,
+  },
+};
 
 export function effectiveTelemetryPoints(payload: ProjectedLapPayload): ProjectedLapPoint[] {
   return payload.effectivePoints.length > 0 ? payload.effectivePoints : payload.points;

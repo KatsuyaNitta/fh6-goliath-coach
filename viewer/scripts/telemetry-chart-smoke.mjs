@@ -90,14 +90,58 @@ for (let index = 1; index < first.points.length; index += 1) {
 }
 assert.ok(telemetryChart.decimateTelemetryPoints(many, 4).points.length <= telemetryChart.decimateTelemetryPoints(many, 16).points.length);
 
+assert.deepEqual(telemetryChart.TELEMETRY_CHANNELS.map((channel) => channel.id), ["speed", "throttle", "brake", "steering"]);
+assert.ok(telemetryChart.TELEMETRY_TRACK_LAYOUTS.speed.height > telemetryChart.TELEMETRY_TRACK_LAYOUTS.throttle.height);
+assert.equal(telemetryChart.TELEMETRY_TRACK_LAYOUTS.throttle.height, telemetryChart.TELEMETRY_TRACK_LAYOUTS.brake.height);
+assert.equal(telemetryChart.TELEMETRY_TRACK_LAYOUTS.brake.height, telemetryChart.TELEMETRY_TRACK_LAYOUTS.steering.height);
+assert.deepEqual(
+  Object.entries(telemetryChart.TELEMETRY_TRACK_LAYOUTS).filter(([, layout]) => layout.showDistanceLabels).map(([channel]) => channel),
+  ["steering"],
+);
+assert.deepEqual(
+  Object.entries(telemetryChart.TELEMETRY_TRACK_LAYOUTS).filter(([, layout]) => layout.showSectionLabels).map(([channel]) => channel),
+  ["steering"],
+);
+assert.deepEqual(
+  Object.entries(telemetryChart.TELEMETRY_TRACK_LAYOUTS).filter(([, layout]) => layout.showMarkerLabels).map(([channel]) => channel),
+  ["speed"],
+);
+assert.deepEqual(
+  Object.entries(telemetryChart.TELEMETRY_TRACK_LAYOUTS).filter(([, layout]) => layout.showRewindLabels).map(([channel]) => channel),
+  ["speed"],
+);
+assert.equal(Object.values(telemetryChart.TELEMETRY_TRACK_LAYOUTS).every((layout) => layout.showGuideLines), true);
+
 const panelSource = await readFile(new URL("../src/components/TelemetryChartsPanel.tsx", import.meta.url), "utf-8");
+const canvasSource = await readFile(new URL("../src/components/TelemetryChartCanvas.tsx", import.meta.url), "utf-8");
+const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf-8");
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
+const tasksSource = await readFile(new URL("../../TASKS.md", import.meta.url), "utf-8");
 assert.match(panelSource, /Telemetry Charts/);
 assert.match(panelSource, /Full lap/);
 assert.match(panelSource, /Selected section/);
 assert.match(panelSource, /Clear cursor/);
 assert.match(appSource, /Load CSV manually/);
 assert.match(panelSource, /ProjectedLapPayload/);
+assert.match(panelSource, /TELEMETRY_TRACK_LAYOUTS/);
+assert.match(panelSource, /height=\{layout\.height\}/);
+assert.match(panelSource, /showDistanceLabels=\{layout\.showDistanceLabels\}/);
+assert.match(panelSource, /showSectionLabels=\{layout\.showSectionLabels\}/);
+assert.match(panelSource, /showMarkerLabels=\{layout\.showMarkerLabels\}/);
+assert.match(panelSource, /showRewindLabels=\{layout\.showRewindLabels\}/);
+assert.match(canvasSource, /visible.*drawn/s);
+assert.doesNotMatch(canvasSource, /className="telemetry-chart-description"/);
+assert.match(canvasSource, /<small>Unavailable<\/small>/);
+assert.match(canvasSource, /Not available - reprocess the session\./);
+assert.match(canvasSource, /onHoverPoint\(point\)/);
+assert.match(canvasSource, /onPinPoint\(point\)/);
+assert.match(stylesSource, /\.telemetry-chart-stack\s*\{[^}]*gap:\s*6px/s);
+assert.match(stylesSource, /grid-template-columns:\s*96px minmax\(0, 1fr\)/);
+assert.match(stylesSource, /@media \(max-width: 700px\)/);
+const desktopBreakpointBlock = stylesSource.match(/@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+assert.doesNotMatch(desktopBreakpointBlock, /\.telemetry-chart-track[\s\S]*?grid-template-columns:\s*1fr/);
+assert.match(tasksSource, /- \[ \] Overview map mode:/);
+assert.match(tasksSource, /slow automatic rotation/);
 assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/);
 const lifecycleCall = appSource.slice(appSource.indexOf("const cameraLifecycleKey"), appSource.indexOf("}, [cameraResetKey"));
 assert.doesNotMatch(lifecycleCall, /activeTelemetryPoint|hoveredTelemetryPoint|pinnedTelemetryPoint/);

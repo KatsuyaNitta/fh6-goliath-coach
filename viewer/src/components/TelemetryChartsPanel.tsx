@@ -7,6 +7,7 @@ import {
   telemetryChannelValue,
   telemetryRange,
   TELEMETRY_CHANNELS,
+  TELEMETRY_TRACK_LAYOUTS,
   type TelemetryRangeMode,
 } from "../lib/telemetryChart";
 import { TelemetryChartCanvas } from "./TelemetryChartCanvas";
@@ -85,23 +86,32 @@ export function TelemetryChartsPanel({
         {cursorPoint ? <CursorValues point={cursorPoint} /> : <span>Move over a chart to inspect distance, section, lap time, and channel values.</span>}
       </div>
       <div className="telemetry-chart-stack">
-        {TELEMETRY_CHANNELS.map((channel) => (
-          <TelemetryChartCanvas
-            activePoint={cursorPoint}
-            available={telemetryChannelAvailable(projectedLap, channel.id)}
-            channel={channel}
-            key={channel.id}
-            markers={reference.markers}
-            onHoverPoint={onHoverTelemetryPoint}
-            onPinPoint={pinPoint}
-            onSelectRewindCluster={onSelectRewindCluster}
-            points={points}
-            range={range}
-            rewindClusters={projectedLap.rewindClusters}
-            sections={reference.sections}
-            selectedRewindClusterId={selectedRewindClusterId}
-          />
-        ))}
+        {TELEMETRY_CHANNELS.map((channel) => {
+          const layout = TELEMETRY_TRACK_LAYOUTS[channel.id];
+          return (
+            <TelemetryChartCanvas
+              activePoint={cursorPoint}
+              available={telemetryChannelAvailable(projectedLap, channel.id)}
+              channel={channel}
+              height={layout.height}
+              key={channel.id}
+              markers={reference.markers}
+              onHoverPoint={onHoverTelemetryPoint}
+              onPinPoint={pinPoint}
+              onSelectRewindCluster={onSelectRewindCluster}
+              points={points}
+              range={range}
+              rewindClusters={projectedLap.rewindClusters}
+              sections={reference.sections}
+              selectedRewindClusterId={selectedRewindClusterId}
+              showDistanceLabels={layout.showDistanceLabels}
+              showGuideLines={layout.showGuideLines}
+              showMarkerLabels={layout.showMarkerLabels}
+              showRewindLabels={layout.showRewindLabels}
+              showSectionLabels={layout.showSectionLabels}
+            />
+          );
+        })}
       </div>
       <p className="telemetry-chart-description-text">
         Effective driving trace uses non-superseded samples. Rewind markers remain event markers. Decimation is display-only and preserves extrema.
@@ -112,7 +122,7 @@ export function TelemetryChartsPanel({
 
 function CursorValues({ point }: { point: ProjectedLapPoint }) {
   return (
-    <dl>
+    <dl className="telemetry-cursor-values">
       <div><dt>Distance</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
       <div><dt>Section</dt><dd>{point.sectionId}</dd></div>
       <div><dt>Lap time</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>

@@ -222,6 +222,7 @@
 - [x] Non-selected sections are gray and dimmed.
 - [x] Selected section boundary markers are emphasized.
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
+- [ ] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
 - [x] Show section start/end/length.
 - [x] Add loading and error states.
 

@@ -23,6 +23,12 @@ interface TelemetryChartCanvasProps {
   activePoint: ProjectedLapPoint | null;
   selectedRewindClusterId: string;
   available: boolean;
+  height: number;
+  showDistanceLabels: boolean;
+  showSectionLabels: boolean;
+  showMarkerLabels: boolean;
+  showRewindLabels: boolean;
+  showGuideLines: boolean;
   onHoverPoint: (point: ProjectedLapPoint | null) => void;
   onPinPoint: (point: ProjectedLapPoint | null) => void;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
@@ -30,8 +36,8 @@ interface TelemetryChartCanvasProps {
 
 const PADDING_LEFT = 58;
 const PADDING_RIGHT = 14;
-const PADDING_TOP = 12;
-const PADDING_BOTTOM = 24;
+const PADDING_TOP = 8;
+const PADDING_BOTTOM = 18;
 
 export function TelemetryChartCanvas({
   channel,
@@ -43,6 +49,12 @@ export function TelemetryChartCanvas({
   activePoint,
   selectedRewindClusterId,
   available,
+  height,
+  showDistanceLabels,
+  showSectionLabels,
+  showMarkerLabels,
+  showRewindLabels,
+  showGuideLines,
   onHoverPoint,
   onPinPoint,
   onSelectRewindCluster,
@@ -51,7 +63,7 @@ export function TelemetryChartCanvas({
   const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
-  const [size, setSize] = useState({ width: 720, height: 124 });
+  const [size, setSize] = useState({ width: 720, height });
   const visiblePoints = useMemo(() => pointsInRange(points, range), [points, range]);
   const decimated = useMemo(
     () => decimateTelemetryPoints(visiblePoints, Math.max(1, size.width - PADDING_LEFT - PADDING_RIGHT), [channel.id]),
@@ -71,12 +83,16 @@ export function TelemetryChartCanvas({
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (rect) {
-        setSize({ width: Math.max(240, rect.width), height: 124 });
+        setSize({ width: Math.max(240, rect.width), height });
       }
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [height]);
+
+  useEffect(() => {
+    setSize((current) => ({ ...current, height }));
+  }, [height]);
 
   useEffect(() => {
     drawStaticLayer(staticCanvasRef.current, {
@@ -89,9 +105,14 @@ export function TelemetryChartCanvas({
       rewindClusters: visibleRewinds,
       sections: visibleSections(sections, range),
       selectedRewindClusterId,
+      showDistanceLabels,
+      showGuideLines,
+      showMarkerLabels,
+      showRewindLabels,
+      showSectionLabels,
       size,
     });
-  }, [available, channel, decimated.points, domain, markers, range, sections, selectedRewindClusterId, size, visibleRewinds]);
+  }, [available, channel, decimated.points, domain, markers, range, sections, selectedRewindClusterId, showDistanceLabels, showGuideLines, showMarkerLabels, showRewindLabels, showSectionLabels, size, visibleRewinds]);
 
   useEffect(() => {
     drawOverlayLayer(overlayCanvasRef.current, { activePoint, channel, domain, range, size });
@@ -129,9 +150,22 @@ export function TelemetryChartCanvas({
 
   return (
     <div className="telemetry-chart-track" aria-label={`${channel.label} telemetry chart`}>
-      <div className="telemetry-chart-label">
+      <div
+        aria-label={`${channel.label}. ${available ? `${visiblePoints.length} visible samples; ${decimated.points.length} drawn.` : "Unavailable."}`}
+        className="telemetry-chart-label"
+        title={channel.description}
+      >
         <b>{channel.label}</b>
         <span>{channel.unit}</span>
+        {available ? (
+          <small>
+            {visiblePoints.length.toLocaleString()} visible
+            <br />
+            {decimated.points.length.toLocaleString()} drawn
+          </small>
+        ) : (
+          <small>Unavailable</small>
+        )}
       </div>
       <div
         className="telemetry-chart-canvas-wrap"
@@ -139,16 +173,14 @@ export function TelemetryChartCanvas({
         onPointerLeave={() => onHoverPoint(null)}
         onPointerMove={handlePointerMove}
         ref={containerRef}
+        style={{ minHeight: `${height}px` }}
       >
         <canvas aria-hidden="true" className="telemetry-chart-canvas" ref={staticCanvasRef} />
         <canvas aria-hidden="true" className="telemetry-chart-canvas overlay" ref={overlayCanvasRef} />
         {!available ? (
-          <div className="telemetry-chart-empty">Not available in this processed file. Reprocess the session to add this channel.</div>
+          <div className="telemetry-chart-empty">Not available - reprocess the session.</div>
         ) : null}
       </div>
-      <span className="telemetry-chart-description">
-        {channel.description}. Visible samples {visiblePoints.length}; drawn {decimated.points.length}.
-      </span>
     </div>
   );
 }
@@ -163,6 +195,11 @@ interface StaticLayerArgs {
   rewindClusters: RewindClusterPayload[];
   sections: SectionDefinition[];
   selectedRewindClusterId: string;
+  showDistanceLabels: boolean;
+  showSectionLabels: boolean;
+  showMarkerLabels: boolean;
+  showRewindLabels: boolean;
+  showGuideLines: boolean;
   size: { width: number; height: number };
 }
 
@@ -171,11 +208,11 @@ function drawStaticLayer(canvas: HTMLCanvasElement | null, args: StaticLayerArgs
   if (!context) {
     return;
   }
-  const { available, channel, decimatedPoints, domain, markers, range, rewindClusters, sections, selectedRewindClusterId, size } = args;
+  const { available, channel, decimatedPoints, domain, markers, range, rewindClusters, sections, selectedRewindClusterId, showDistanceLabels, showGuideLines, showMarkerLabels, showRewindLabels, showSectionLabels, size } = args;
   context.clearRect(0, 0, size.width, size.height);
   drawFrame(context, size);
-  drawSectionBands(context, sections, range, size);
-  drawAxisLabels(context, range, domain, size);
+  drawSectionBands(context, sections, range, size, showSectionLabels);
+  drawAxisLabels(context, range, domain, size, showDistanceLabels);
   if (channel.id === "steering") {
     const y = valueToY(0, domain, size);
     context.strokeStyle = "rgba(226,232,240,0.22)";
@@ -185,18 +222,26 @@ function drawStaticLayer(canvas: HTMLCanvasElement | null, args: StaticLayerArgs
   }
   for (const marker of markers) {
     const x = distanceToX(marker.course_distance_m, size, range);
-    context.strokeStyle = "rgba(248,250,252,0.45)";
-    line(context, x, PADDING_TOP, x, size.height - PADDING_BOTTOM);
-    context.fillStyle = "rgba(248,250,252,0.82)";
-    context.fillText(marker.label, x + 3, PADDING_TOP + 12);
+    if (showGuideLines) {
+      context.strokeStyle = "rgba(248,250,252,0.45)";
+      line(context, x, PADDING_TOP, x, size.height - PADDING_BOTTOM);
+    }
+    if (showMarkerLabels) {
+      context.fillStyle = "rgba(248,250,252,0.82)";
+      context.fillText(marker.label, x + 3, PADDING_TOP + 12);
+    }
   }
   for (const cluster of rewindClusters) {
     const x = distanceToX(cluster.courseDistanceM, size, range);
     context.strokeStyle = cluster.clusterId === selectedRewindClusterId ? "rgba(250,204,21,0.95)" : "rgba(250,204,21,0.52)";
     context.lineWidth = cluster.clusterId === selectedRewindClusterId ? 2 : 1;
-    line(context, x, PADDING_TOP, x, size.height - PADDING_BOTTOM);
-    context.fillStyle = "rgba(250,204,21,0.9)";
-    context.fillText(`R${cluster.eventCount}`, x + 3, size.height - PADDING_BOTTOM - 4);
+    if (showGuideLines) {
+      line(context, x, PADDING_TOP, x, size.height - PADDING_BOTTOM);
+    }
+    if (showRewindLabels || cluster.clusterId === selectedRewindClusterId) {
+      context.fillStyle = "rgba(250,204,21,0.9)";
+      context.fillText(`R${cluster.eventCount}`, x + 3, size.height - PADDING_BOTTOM - 4);
+    }
     context.lineWidth = 1;
   }
   if (!available || decimatedPoints.length === 0) {
@@ -287,14 +332,17 @@ function drawSectionBands(
   sections: SectionDefinition[],
   range: TelemetryChartRange,
   size: { width: number; height: number },
+  showLabels: boolean,
 ): void {
   for (const section of sections) {
     const start = distanceToX(Math.max(section.start_distance_m, range.startM), size, range);
     const end = distanceToX(Math.min(section.end_distance_m, range.endM), size, range);
     context.fillStyle = `${SECTION_COLORS[section.id]}22`;
     context.fillRect(start, PADDING_TOP, Math.max(1, end - start), size.height - PADDING_TOP - PADDING_BOTTOM);
-    context.fillStyle = "rgba(226,232,240,0.46)";
-    context.fillText(section.id, start + 4, size.height - 8);
+    if (showLabels) {
+      context.fillStyle = "rgba(226,232,240,0.46)";
+      context.fillText(section.id, start + 4, size.height - 7);
+    }
   }
 }
 
@@ -303,12 +351,15 @@ function drawAxisLabels(
   range: TelemetryChartRange,
   domain: [number, number],
   size: { width: number; height: number },
+  showDistanceLabels: boolean,
 ): void {
   context.fillStyle = "rgba(226,232,240,0.75)";
   context.fillText(domain[1].toFixed(domain[1] <= 2 ? 1 : 0), 8, PADDING_TOP + 8);
   context.fillText(domain[0].toFixed(domain[1] <= 2 ? 1 : 0), 8, size.height - PADDING_BOTTOM);
-  context.fillText(`${(range.startM / 1000).toFixed(1)} km`, PADDING_LEFT, size.height - 7);
-  context.fillText(`${(range.endM / 1000).toFixed(1)} km`, size.width - 72, size.height - 7);
+  if (showDistanceLabels) {
+    context.fillText(`${(range.startM / 1000).toFixed(1)} km`, PADDING_LEFT, size.height - 6);
+    context.fillText(`${(range.endM / 1000).toFixed(1)} km`, size.width - 72, size.height - 6);
+  }
 }
 
 function valueDomain(points: ProjectedLapPoint[], channel: TelemetryChannelConfig): [number, number] {
