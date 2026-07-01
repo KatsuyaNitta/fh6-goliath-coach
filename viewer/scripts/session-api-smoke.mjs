@@ -88,6 +88,31 @@ await assert.rejects(api.fetchSessions(), /Invalid session-list response schema/
 globalThis.fetch = async () => jsonResponse({ schema_version: "goliath-local-web-error-v1", error: { code: "already_processed", message: "Already done" } }, 409);
 await assert.rejects(api.processSession("20260630_200504"), /Already done/);
 
+let requestedInit = undefined;
+globalThis.fetch = async (url, init) => {
+  requestedUrl = String(url);
+  requestedInit = init;
+  return jsonResponse({
+    schema_version: "goliath-session-action-v1",
+    session_id: "20260630_200504",
+    status: "trashed",
+    trashed_items: ["session", "state"],
+  });
+};
+const trashResult = await api.trashSession("20260630_200504");
+assert.equal(requestedUrl, "/api/sessions/20260630_200504/trash");
+assert.equal(requestedInit.method, "POST");
+assert.equal(JSON.parse(requestedInit.body).confirm_session_id, "20260630_200504");
+assert.deepEqual(trashResult.trashed_items, ["session", "state"]);
+
+globalThis.fetch = async () => jsonResponse({
+  schema_version: "goliath-session-action-v1",
+  session_id: "20260630_200504",
+  status: "trashed",
+  trashed_items: ["processed"],
+});
+await assert.rejects(api.trashSession("20260630_200504"), /Invalid trash-session response schema/);
+
 globalThis.fetch = async () => new Response("plain failure", { status: 500, headers: { "Content-Type": "text/plain" } });
 await assert.rejects(api.fetchProjectedLapCsv("20260630_200504"), /plain failure/);
 
@@ -115,6 +140,17 @@ const componentSource = await readFile(new URL("../src/components/SessionBrowser
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
 assert.match(componentSource, /Process & Load/, "browser panel should expose Process & Load");
 assert.match(componentSource, /"Load"/, "browser panel should expose Load for processed sessions");
+assert.match(componentSource, /ごみ箱へ移動/, "browser panel should expose the requested trash action label");
+assert.match(componentSource, /キャンセル/, "trash dialog should expose an explicit cancel action");
+assert.match(componentSource, /<dialog[\s\S]*aria-labelledby/, "trash confirmation should use an accessible dialog");
+assert.match(componentSource, /cancelButtonRef[\s\S]*focus/, "cancel should receive initial dialog focus");
+assert.match(componentSource, /setTrashDialogSessionId\(""\)/, "cancel should close the dialog without calling the API");
+assert.match(componentSource, /trashSession\(session\.session_id\)/, "confirmation should call the trash API once for the selected session");
+assert.match(componentSource, /setSelectedSessionId\(""\)/, "successful trash should clear the selected session");
+assert.match(componentSource, /refreshSessions\(\)/, "successful trash should refresh the session list");
+assert.match(componentSource, /process_status === "processed"[\s\S]*Processed sessions are protected/, "processed sessions should not expose an enabled trash action");
+assert.match(componentSource, /process_status === "partial"[\s\S]*Partial processed output/, "partial sessions should not expose an enabled trash action");
+assert.match(componentSource, /session\.session_id !== loadedSessionId/, "loaded sessions should not be trashable");
 assert.match(appSource, /Load CSV manually/, "manual CSV loading should remain available");
 assert.match(componentSource, /Local session service unavailable\./, "service unavailable should be nonfatal and visible");
 assert.match(componentSource, /loadedSessionId/, "selected and loaded session state should be separate");

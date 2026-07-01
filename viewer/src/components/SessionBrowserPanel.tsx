@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { fetchProjectedLapCsv, fetchSessions, processSession, SessionApiError, type SessionRecord } from "../lib/sessionApi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  fetchProjectedLapCsv,
+  fetchSessions,
+  processSession,
+  SessionApiError,
+  trashSession,
+  type SessionRecord,
+} from "../lib/sessionApi";
 import { parseProjectedLapCsv, type ProjectedLapPayload } from "../lib/telemetryLap";
 
 interface SessionBrowserPanelProps {
@@ -8,6 +15,9 @@ interface SessionBrowserPanelProps {
 }
 
 type ActionKind = "load" | "process" | "disabled";
+const TRASH_ACTION_LABEL = "ごみ箱へ移動";
+const TRASH_CANCEL_LABEL = "キャンセル";
+const UNKNOWN_STARTED_LABEL = "開始時刻不明";
 
 export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: SessionBrowserPanelProps) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -15,8 +25,11 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
   const [showIgnored, setShowIgnored] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [actionSessionId, setActionSessionId] = useState("");
+  const [trashDialogSessionId, setTrashDialogSessionId] = useState("");
   const [statusText, setStatusText] = useState("");
   const [errorText, setErrorText] = useState("");
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const selectedSession = useMemo(() => {
     return sessions.find((session) => session.session_id === selectedSessionId);
@@ -25,6 +38,23 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
   useEffect(() => {
     void refreshSessions();
   }, [showIgnored]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+    if (trashDialogSessionId) {
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      window.setTimeout(() => cancelButtonRef.current?.focus(), 0);
+      return;
+    }
+    if (dialog.open) {
+      dialog.close();
+    }
+  }, [trashDialogSessionId]);
 
   async function refreshSessions(): Promise<void> {
     setLoadingList(true);
@@ -73,8 +103,29 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
     }
   }
 
+  async function confirmTrashSession(session: SessionRecord): Promise<void> {
+    setActionSessionId(session.session_id);
+    setErrorText("");
+    setStatusText("Moving session to the Windows Recycle Bin...");
+    try {
+      await trashSession(session.session_id);
+      setTrashDialogSessionId("");
+      setSelectedSessionId("");
+      await refreshSessions();
+      setStatusText(`セッション ${session.session_id} をWindowsのごみ箱へ移動しました。`);
+    } catch (error) {
+      setErrorText(apiMessage(error, "Failed to move session to the Windows Recycle Bin."));
+      setStatusText("");
+    } finally {
+      setActionSessionId("");
+    }
+  }
+
   const action = selectedSession ? actionForSession(selectedSession) : "disabled";
   const busy = Boolean(actionSessionId);
+  const trashAvailable = selectedSession ? canTrashSession(selectedSession, loadedSessionId, busy) : false;
+  const trashHelp = selectedSession ? trashAvailabilityText(selectedSession, loadedSessionId, busy) : "";
+  const dialogSession = sessions.find((session) => session.session_id === trashDialogSessionId);
 
   return (
     <section className="session-browser-panel">
@@ -131,8 +182,60 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
               {actionSessionId === selectedSession.session_id ? "Loading..." : "Load"}
             </button>
           ) : null}
+          {trashHelp ? <p className="status-text">{trashHelp}</p> : null}
+          {trashAvailable ? (
+            <button className="command-button danger-button" disabled={busy} type="button" onClick={() => setTrashDialogSessionId(selectedSession.session_id)}>
+              {TRASH_ACTION_LABEL}
+            </button>
+          ) : null}
         </div>
       ) : null}
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="trash-session-dialog-title"
+        className="danger-dialog"
+        onCancel={(event) => {
+          event.preventDefault();
+          if (!busy) {
+            setTrashDialogSessionId("");
+          }
+        }}
+        onClick={(event) => {
+          if (event.target === dialogRef.current && !busy) {
+            setTrashDialogSessionId("");
+          }
+        }}
+      >
+        {dialogSession ? (
+          <form method="dialog" onSubmit={(event) => event.preventDefault()}>
+            <h2 id="trash-session-dialog-title">Windows Recycle Bin</h2>
+            <dl className="dialog-details">
+              <div>
+                <dt>Vehicle</dt>
+                <dd>{dialogSession.vehicle.display_name || "Unknown vehicle"}</dd>
+              </div>
+              <div>
+                <dt>Session</dt>
+                <dd>{dialogSession.session_id}</dd>
+              </div>
+              <div>
+                <dt>Started</dt>
+                <dd>{formatStarted(dialogSession.started_at, UNKNOWN_STARTED_LABEL)}</dd>
+              </div>
+            </dl>
+            <p>このセッションをWindowsのごみ箱へ移動しますか？</p>
+            <p className="status-text">処理済みデータは対象外です。ごみ箱から復元できます。</p>
+            <div className="dialog-actions">
+              <button ref={cancelButtonRef} className="command-button" disabled={busy} type="button" onClick={() => setTrashDialogSessionId("")}>
+                {TRASH_CANCEL_LABEL}
+              </button>
+              <button className="command-button danger-button" disabled={busy} type="button" onClick={() => void confirmTrashSession(dialogSession)}>
+                {actionSessionId === dialogSession.session_id ? "Moving..." : TRASH_ACTION_LABEL}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </dialog>
     </section>
   );
 }
@@ -169,6 +272,29 @@ function actionHelp(session: SessionRecord): string {
   return "No browser action is available for this session.";
 }
 
+function canTrashSession(session: SessionRecord, loadedSessionId: string, busy: boolean): boolean {
+  return !busy && session.session_id !== loadedSessionId && ["unprocessed", "ignored"].includes(session.process_status);
+}
+
+function trashAvailabilityText(session: SessionRecord, loadedSessionId: string, busy: boolean): string {
+  if (busy) {
+    return "Another session action is running.";
+  }
+  if (session.session_id === loadedSessionId) {
+    return "Loaded sessions cannot be moved to the Windows Recycle Bin.";
+  }
+  if (session.process_status === "processed") {
+    return "Processed sessions are protected from this action.";
+  }
+  if (session.process_status === "partial") {
+    return "Partial processed output needs CLI inspection before this action.";
+  }
+  if (["unprocessed", "ignored"].includes(session.process_status)) {
+    return "Eligible source sessions can be moved to the Windows Recycle Bin.";
+  }
+  return "";
+}
+
 function sessionCardClass(session: SessionRecord, selectedSessionId: string, loadedSessionId: string): string {
   const classes = ["session-card"];
   if (session.session_id === selectedSessionId) {
@@ -184,9 +310,9 @@ function StatusBadge({ label }: { label: string }) {
   return <span className={`status-badge status-${label.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}`}>{label}</span>;
 }
 
-function formatStarted(value: string | null): string {
+function formatStarted(value: string | null, fallback = "Unknown start"): string {
   if (!value) {
-    return "Unknown start";
+    return fallback;
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {

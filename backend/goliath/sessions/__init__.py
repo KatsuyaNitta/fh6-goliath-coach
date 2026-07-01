@@ -7,6 +7,7 @@ from goliath.sessions.model import (
     SessionRecord,
 )
 from goliath.sessions.state import remove_ignored_state, validate_session_id, write_ignored_state
+from goliath.sessions.trash import trash_managed_session
 
 __all__ = [
     "DEFAULT_PROCESSED_ROOT",
@@ -17,6 +18,7 @@ __all__ = [
     "find_session",
     "process_managed_session",
     "remove_ignored_state",
+    "trash_managed_session",
     "validate_session_id",
     "write_ignored_state",
 ]

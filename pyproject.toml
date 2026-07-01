@@ -3,7 +3,9 @@ name = "fh6-goliath-coach"
 version = "0.1.0"
 description = "Goliath-specific telemetry analysis and 3D reference-path viewer for Forza Horizon 6."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "Send2Trash>=1.8",
+]
 
 [project.optional-dependencies]
 dev = [

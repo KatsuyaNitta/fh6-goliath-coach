@@ -10,7 +10,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from goliath.sessions.state import validate_session_id
-from goliath.web.app import ApiError, LocalWebApp, WebConfig, error_payload, parse_bool_query, parse_json_body
+from goliath.web.app import (
+    ApiError,
+    LocalWebApp,
+    WebConfig,
+    error_payload,
+    parse_bool_query,
+    parse_json_body,
+    parse_trash_json_body,
+)
 
 
 class LocalGoliathServer(ThreadingHTTPServer):
@@ -62,11 +70,23 @@ def build_handler(app: LocalWebApp):
                 return
             body = self.rfile.read(body_length) if body_length else b""
             try:
-                parse_json_body(body, self.headers.get("Content-Type"))
-                session_id = self._extract_session_action(parsed.path, "process")
-                payload = app.process_session_payload(session_id)
+                action = self._extract_post_action(parsed.path)
+                if action == "process":
+                    parse_json_body(body, self.headers.get("Content-Type"))
+                    session_id = self._extract_session_action(parsed.path, "process")
+                    payload = app.process_session_payload(session_id)
+                elif action == "trash":
+                    session_id = self._extract_session_action(parsed.path, "trash")
+                    parse_trash_json_body(body, self.headers.get("Content-Type"), session_id)
+                    payload = app.trash_session_payload(session_id)
+                else:
+                    self._json_error(404, "not_found", "API endpoint not found.")
+                    return
             except ApiError as exc:
                 self._json_error(exc.status, exc.code, exc.message)
+                return
+            except ValueError as exc:
+                self._json_error(400, "invalid_session_id", str(exc))
                 return
             self._json_response(200, payload)
 
@@ -100,6 +120,16 @@ def build_handler(app: LocalWebApp):
             if not encoded:
                 raise ApiError(400, "invalid_session_id", "Missing session ID.")
             return validate_session_id(unquote(encoded))
+
+        def _extract_post_action(self, path: str) -> str:
+            prefix = "/api/sessions/"
+            if not path.startswith(prefix):
+                raise ApiError(404, "not_found", "API endpoint not found.")
+            tail = path[len(prefix):]
+            parts = tail.split("/")
+            if len(parts) != 2 or not parts[0]:
+                raise ApiError(404, "not_found", "API endpoint not found.")
+            return parts[1]
 
         def _send_projected_lap(self, session_id: str) -> None:
             path = app.projected_lap_path(session_id)

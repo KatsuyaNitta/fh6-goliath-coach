@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from goliath.sessions.model import ManagedProcessingError
+from goliath.sessions.trash import trash_managed_session
 from goliath.telemetry.importer import REQUIRED_COLUMNS
 from goliath.web.app import ApiError, LocalWebApp, WebConfig
 from goliath.web.server import create_server, validate_bind_host
@@ -176,6 +177,103 @@ class LocalWebAppTests(unittest.TestCase):
             with self.assertRaises(ApiError):
                 app.projected_lap_path("20260630_200505")
 
+    def test_trash_unprocessed_session_and_optional_ignored_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            session_dir = fixture.write_session()
+            app = LocalWebApp(fixture.config())
+            trashed: list[str] = []
+            app.trash_sender = trashed.append
+
+            payload = app.trash_session_payload("20260630_200504")
+
+            self.assertEqual(payload["status"], "trashed")
+            self.assertEqual(payload["trashed_items"], ["session"])
+            self.assertEqual(trashed, [str(session_dir.resolve())])
+
+            ignored_dir = fixture.write_session("20260630_200505", ignored=True)
+            trashed.clear()
+            payload = app.trash_session_payload("20260630_200505")
+            self.assertEqual(payload["trashed_items"], ["session", "state"])
+            self.assertEqual(
+                trashed,
+                [str(ignored_dir.resolve()), str((fixture.state / "20260630_200505.json").resolve())],
+            )
+
+    def test_trash_rejects_processed_partial_missing_loaded_and_unsafe_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            fixture.write_session()
+            fixture.write_processed()
+            partial_dir = fixture.processed / "20260630_200505"
+            partial_dir.mkdir()
+            fixture.write_session("20260630_200505")
+            app = LocalWebApp(fixture.config())
+            trashed: list[str] = []
+            app.trash_sender = trashed.append
+
+            with self.assertRaisesRegex(ApiError, "processed sessions"):
+                app.trash_session_payload("20260630_200504")
+            with self.assertRaisesRegex(ApiError, "partial processed output"):
+                app.trash_session_payload("20260630_200505")
+            with self.assertRaisesRegex(ApiError, "session not found"):
+                app.trash_session_payload("20260630_999999")
+            with self.assertRaisesRegex(ApiError, "unsafe session ID"):
+                app.trash_session_payload("..\\bad")
+            self.assertEqual(trashed, [])
+
+            fixture.write_processed("20260630_200506")
+            fixture.write_session("20260630_200506")
+            app.projected_lap_path("20260630_200506")
+            with self.assertRaisesRegex(ApiError, "Loaded session"):
+                app.trash_session_payload("20260630_200506")
+            self.assertEqual(trashed, [])
+
+    def test_trash_sender_failures_do_not_report_false_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            fixture.write_session()
+            app = LocalWebApp(fixture.config())
+
+            def fail_session(_path: str) -> None:
+                raise RuntimeError("no recycle bin")
+
+            app.trash_sender = fail_session
+            with self.assertRaisesRegex(ApiError, "could not move session"):
+                app.trash_session_payload("20260630_200504")
+
+            fixture.write_session("20260630_200505", ignored=True)
+            calls: list[str] = []
+
+            def fail_state(path: str) -> None:
+                calls.append(path)
+                if path.endswith(".json"):
+                    raise RuntimeError("state failure")
+
+            app.trash_sender = fail_state
+            with self.assertRaisesRegex(ApiError, "ignored-state file was not"):
+                app.trash_session_payload("20260630_200505")
+            self.assertEqual(len(calls), 2)
+
+    def test_trash_rejects_symlink_source_when_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            target = fixture.root / "target"
+            target.mkdir()
+            link = fixture.sessions / "20260630_200504"
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation is unavailable on this platform")
+            with self.assertRaisesRegex(Exception, "direct child|symlink"):
+                trash_managed_session(
+                    "20260630_200504",
+                    sessions_root=fixture.sessions,
+                    processed_root=fixture.processed,
+                    state_root=fixture.state,
+                    trash_sender=lambda _path: None,
+                )
+
 
 class LocalWebHttpTests(unittest.TestCase):
     def test_health_endpoint_and_json_headers(self) -> None:
@@ -274,6 +372,144 @@ class LocalWebHttpTests(unittest.TestCase):
             self.assertEqual(not_processable[0], 422)
             self.assertEqual(already[0], 409)
             self.assertEqual(missing[0], 404)
+
+    def test_trash_endpoint_success_body_errors_and_expected_mappings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            fixture.write_session()
+            fixture.write_session("20260630_200505", ignored=True)
+            fixture.write_processed("20260630_200506")
+            fixture.write_session("20260630_200506")
+            partial_dir = fixture.processed / "20260630_200507"
+            partial_dir.mkdir()
+            fixture.write_session("20260630_200507")
+            server = RunningServer(fixture.config())
+            trashed: list[str] = []
+            server.server.app.trash_sender = trashed.append
+            try:
+                success = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200504"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                ignored = server.request(
+                    "/api/sessions/20260630_200505/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200505"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                missing_confirmation = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b"{}",
+                    headers={"Content-Type": "application/json"},
+                )
+                mismatch = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_999999"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                unexpected = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200504","path":"x"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                malformed = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b"{bad",
+                    headers={"Content-Type": "application/json"},
+                )
+                unsupported = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200504"}',
+                    headers={"Content-Type": "text/plain"},
+                )
+                processed = server.request(
+                    "/api/sessions/20260630_200506/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200506"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                partial = server.request(
+                    "/api/sessions/20260630_200507/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200507"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                missing = server.request(
+                    "/api/sessions/20260630_999999/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_999999"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                traversal = server.request(
+                    "/api/sessions/..%5Cbad/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"..\\\\bad"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                unknown_action = server.request(
+                    "/api/sessions/20260630_200504/nope",
+                    method="POST",
+                    body=b"{}",
+                    headers={"Content-Type": "application/json"},
+                )
+                delete = server.request("/api/sessions/20260630_200504/trash", method="DELETE")
+            finally:
+                server.close()
+
+            self.assertEqual(success[0], 200)
+            self.assertEqual(json.loads(success[2])["trashed_items"], ["session"])
+            self.assertEqual(ignored[0], 200)
+            self.assertEqual(json.loads(ignored[2])["trashed_items"], ["session", "state"])
+            self.assertEqual(missing_confirmation[0], 400)
+            self.assertEqual(json.loads(missing_confirmation[2])["error"]["code"], "confirmation_required")
+            self.assertEqual(mismatch[0], 400)
+            self.assertEqual(json.loads(mismatch[2])["error"]["code"], "confirmation_mismatch")
+            self.assertEqual(unexpected[0], 400)
+            self.assertEqual(malformed[0], 400)
+            self.assertEqual(unsupported[0], 400)
+            self.assertEqual(processed[0], 409)
+            self.assertEqual(json.loads(processed[2])["error"]["code"], "processed_session_not_trashable")
+            self.assertEqual(partial[0], 409)
+            self.assertEqual(json.loads(partial[2])["error"]["code"], "partial_output_not_trashable")
+            self.assertEqual(missing[0], 404)
+            self.assertEqual(traversal[0], 400)
+            self.assertEqual(unknown_action[0], 404)
+            self.assertEqual(delete[0], 405)
+
+    def test_trash_endpoint_lock_conflicts_with_process_endpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            fixture = WebFixture(Path(temp))
+            fixture.write_session()
+            server = RunningServer(fixture.config())
+            server.server.app.trash_sender = lambda _path: None
+            try:
+                server.server.app._session_mutation_lock.acquire()
+                trash_busy = server.request(
+                    "/api/sessions/20260630_200504/trash",
+                    method="POST",
+                    body=b'{"confirm_session_id":"20260630_200504"}',
+                    headers={"Content-Type": "application/json"},
+                )
+                process_busy = server.request(
+                    "/api/sessions/20260630_200504/process",
+                    method="POST",
+                    body=b"{}",
+                    headers={"Content-Type": "application/json"},
+                )
+                server.server.app._session_mutation_lock.release()
+            finally:
+                server.close()
+            self.assertEqual(trash_busy[0], 409)
+            self.assertEqual(json.loads(trash_busy[2])["error"]["code"], "processing_busy")
+            self.assertEqual(process_busy[0], 409)
+            self.assertEqual(json.loads(process_busy[2])["error"]["code"], "processing_busy")
 
     def test_processing_lock_releases_after_exception(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

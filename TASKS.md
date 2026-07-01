@@ -266,6 +266,9 @@
 - [x] Add attempt-detection diagnostics to processed session summaries.
 - [x] Reject invalid short tails and incomplete completed-lap outputs.
 - [x] Add restart-aware regression coverage for short post-finish tails, extra tail resets, valid session-end candidates, ambiguous multiple valid candidates, no valid candidates, pre-lap restarts, and selected-attempt rewind handling.
+- [x] Move eligible unprocessed or ignored source sessions to the Windows Recycle Bin after explicit confirmation.
+- [x] Protect processed and partial session outputs from browser trash actions.
+- [x] Prevent process and trash session actions from running concurrently.
 - [x] Add import error messages.
 - [x] Export normalized session metadata.
 - [x] Generate processed output files.

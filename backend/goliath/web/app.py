@@ -20,6 +20,15 @@ from goliath.sessions.model import (
     SessionNotProcessableError,
 )
 from goliath.sessions.state import validate_session_id
+from goliath.sessions.trash import (
+    PartialRecycleBinFailureError,
+    RecycleBinFailedError,
+    RecycleBinUnavailableError,
+    SessionNotTrashableError,
+    TrashSender,
+    UnsafeSessionPathError,
+    trash_managed_session,
+)
 from goliath.vehicle.catalog import DEFAULT_CATALOG_DIR
 
 HEALTH_SCHEMA_VERSION = "goliath-local-web-health-v1"
@@ -49,13 +58,21 @@ class ApiError(RuntimeError):
 
 class ProcessingBusyError(ApiError):
     def __init__(self) -> None:
-        super().__init__(409, "processing_busy", "Another session is currently being processed.")
+        super().__init__(409, "processing_busy", "Another session operation is already in progress.")
+
+
+class SessionLoadedError(ApiError):
+    def __init__(self, session_id: str) -> None:
+        super().__init__(409, "session_loaded", f"Loaded session cannot be moved to the Recycle Bin: {session_id}.")
 
 
 class LocalWebApp:
     def __init__(self, config: WebConfig) -> None:
         self.config = config
-        self._processing_lock = threading.Lock()
+        self._session_mutation_lock = threading.Lock()
+        self._processing_lock = self._session_mutation_lock
+        self._loaded_session_id = ""
+        self.trash_sender: TrashSender | None = None
 
     def health_payload(self) -> dict[str, object]:
         return {
@@ -84,7 +101,7 @@ class LocalWebApp:
 
     def process_session_payload(self, session_id: str) -> dict[str, object]:
         session_id = validate_session_id(session_id)
-        if not self._processing_lock.acquire(blocking=False):
+        if not self._session_mutation_lock.acquire(blocking=False):
             raise ProcessingBusyError()
         try:
             result = process_managed_session(
@@ -108,7 +125,35 @@ class LocalWebApp:
         except Exception as exc:
             raise map_processing_exception(exc) from exc
         finally:
-            self._processing_lock.release()
+            self._session_mutation_lock.release()
+
+    def trash_session_payload(self, session_id: str) -> dict[str, object]:
+        try:
+            session_id = validate_session_id(session_id)
+        except ValueError as exc:
+            raise ApiError(400, "invalid_session_id", str(exc)) from exc
+        if session_id == self._loaded_session_id:
+            raise SessionLoadedError(session_id)
+        if not self._session_mutation_lock.acquire(blocking=False):
+            raise ProcessingBusyError()
+        try:
+            result = trash_managed_session(
+                session_id,
+                sessions_root=self.config.sessions_root,
+                processed_root=self.config.processed_root,
+                state_root=self.config.state_root,
+                trash_sender=self.trash_sender,
+            )
+            return {
+                "schema_version": ACTION_SCHEMA_VERSION,
+                "session_id": session_id,
+                "status": "trashed",
+                "trashed_items": result.trashed_items,
+            }
+        except Exception as exc:
+            raise map_trash_exception(exc) from exc
+        finally:
+            self._session_mutation_lock.release()
 
     def projected_lap_path(self, session_id: str) -> Path:
         session_id = validate_session_id(session_id)
@@ -129,6 +174,7 @@ class LocalWebApp:
             raise ApiError(404, "projected_lap_not_found", f"Projected lap file is missing for {session_id}.")
         if not filename.endswith("_projected-lap.csv"):
             raise ApiError(404, "projected_lap_not_found", f"Processed output is not a projected-lap CSV for {session_id}.")
+        self._loaded_session_id = session_id
         return candidate
 
     def _find_processed_record(self, session_id: str):
@@ -175,6 +221,31 @@ def parse_json_body(raw: bytes, content_type: str | None) -> dict[str, object]:
     return parsed
 
 
+def parse_trash_json_body(raw: bytes, content_type: str | None, session_id: str) -> dict[str, object]:
+    if len(raw) > MAX_JSON_BODY_BYTES:
+        raise ApiError(400, "body_too_large", "Request body is too large.")
+    if not raw:
+        raise ApiError(400, "confirmation_required", "Trash request requires confirm_session_id.")
+    if not content_type or "application/json" not in content_type.lower():
+        raise ApiError(400, "unsupported_content_type", "Only application/json request bodies are supported.")
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ApiError(400, "malformed_json", f"Malformed JSON request body: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ApiError(400, "invalid_request", "Request body must be a JSON object.")
+    allowed_keys = {"confirm_session_id"}
+    unexpected = sorted(set(parsed) - allowed_keys)
+    if unexpected:
+        raise ApiError(400, "invalid_request", f"Unexpected trash request field: {', '.join(unexpected)}.")
+    confirm_session_id = parsed.get("confirm_session_id")
+    if not isinstance(confirm_session_id, str) or not confirm_session_id:
+        raise ApiError(400, "confirmation_required", "Trash request requires confirm_session_id.")
+    if confirm_session_id != session_id:
+        raise ApiError(400, "confirmation_mismatch", "Trash confirmation does not match URL session ID.")
+    return parsed
+
+
 def error_payload(code: str, message: str) -> dict[str, object]:
     return {
         "schema_version": ERROR_SCHEMA_VERSION,
@@ -200,6 +271,28 @@ def map_processing_exception(exc: Exception) -> ApiError:
         return ApiError(422, "processing_failed", str(exc))
     if isinstance(exc, ValueError):
         return ApiError(400, "invalid_request", str(exc))
+    return ApiError(500, "internal_error", "Unexpected internal error.")
+
+
+def map_trash_exception(exc: Exception) -> ApiError:
+    if isinstance(exc, ApiError):
+        return exc
+    if isinstance(exc, SessionNotFoundError):
+        return ApiError(404, "session_not_found", str(exc))
+    if isinstance(exc, UnsafeSessionPathError):
+        return ApiError(400, "unsafe_session_path", str(exc))
+    if isinstance(exc, SessionNotTrashableError):
+        message = str(exc)
+        code = "partial_output_not_trashable" if "partial" in message.lower() else "processed_session_not_trashable"
+        return ApiError(409, code, message)
+    if isinstance(exc, RecycleBinUnavailableError):
+        return ApiError(500, "recycle_bin_unavailable", str(exc))
+    if isinstance(exc, PartialRecycleBinFailureError):
+        return ApiError(500, "partial_recycle_bin_failure", str(exc))
+    if isinstance(exc, RecycleBinFailedError):
+        return ApiError(500, "recycle_bin_failed", str(exc))
+    if isinstance(exc, ValueError):
+        return ApiError(400, "invalid_session_id", str(exc))
     return ApiError(500, "internal_error", "Unexpected internal error.")
 
 

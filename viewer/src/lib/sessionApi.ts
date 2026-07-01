@@ -52,6 +52,13 @@ export interface ProcessSessionResult {
   summary: Record<string, unknown>;
 }
 
+export interface TrashSessionResult {
+  schema_version: "goliath-session-action-v1";
+  session_id: string;
+  status: "trashed";
+  trashed_items: Array<"session" | "state">;
+}
+
 export interface FetchSessionsOptions {
   includeIgnored?: boolean;
   includeIncomplete?: boolean;
@@ -98,6 +105,15 @@ export async function processSession(sessionId: string): Promise<ProcessSessionR
     body: "{}",
   });
   return assertProcessSessionResult(payload);
+}
+
+export async function trashSession(sessionId: string): Promise<TrashSessionResult> {
+  const payload = await fetchJson(`/api/sessions/${encodeURIComponent(sessionId)}/trash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm_session_id: sessionId }),
+  });
+  return assertTrashSessionResult(payload, sessionId);
 }
 
 export async function fetchProjectedLapCsv(sessionId: string): Promise<ProjectedLapCsvResponse> {
@@ -169,6 +185,23 @@ function assertProcessSessionResult(payload: unknown): ProcessSessionResult {
     throw new SessionApiError("Invalid process-session response schema.", 200, "invalid_schema");
   }
   return payload as unknown as ProcessSessionResult;
+}
+
+function assertTrashSessionResult(payload: unknown, expectedSessionId: string): TrashSessionResult {
+  if (
+    !isRecord(payload)
+    || payload.schema_version !== "goliath-session-action-v1"
+    || payload.status !== "trashed"
+    || payload.session_id !== expectedSessionId
+    || !Array.isArray(payload.trashed_items)
+  ) {
+    throw new SessionApiError("Invalid trash-session response schema.", 200, "invalid_schema");
+  }
+  const allowed = new Set(["session", "state"]);
+  if (!payload.trashed_items.every((item) => typeof item === "string" && allowed.has(item))) {
+    throw new SessionApiError("Invalid trash-session response schema.", 200, "invalid_schema");
+  }
+  return payload as unknown as TrashSessionResult;
 }
 
 function assertApiErrorPayload(payload: unknown): ApiErrorPayload {

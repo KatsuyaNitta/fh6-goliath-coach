@@ -262,10 +262,21 @@ Useful endpoints:
 GET  /api/health
 GET  /api/sessions
 POST /api/sessions/<session_id>/process
+POST /api/sessions/<session_id>/trash
 GET  /api/sessions/<session_id>/projected-lap
 ```
 
 The browser UI never force-processes a session and never processes automatically. Selecting a session only selects it; **Process & Load** explicitly processes an eligible unprocessed session, then loads the generated projected-lap CSV. **Load** fetches an already processed projected-lap CSV. Ignored, incomplete, invalid, and partial sessions are shown as disabled browser actions. Source telemetry CSV, session JSON, and `.fh6raw` files are not served over HTTP.
+
+Eligible unprocessed or ignored source sessions can be moved to the Windows Recycle Bin from the selected-session action panel after an explicit confirmation dialog. This is not permanent deletion. Processed and partial sessions are refused, the currently loaded session is refused, and the action never moves or deletes processed output. The trash endpoint requires a JSON body with a matching `confirm_session_id`:
+
+```json
+{
+  "confirm_session_id": "20260630_200504"
+}
+```
+
+Successful responses use `schema_version: "goliath-session-action-v1"`, `status: "trashed"`, and a `trashed_items` list containing `session` and, when an ignored-state file existed, `state`.
 
 For read-only smoke testing with a custom processed root:
 

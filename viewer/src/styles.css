@@ -116,6 +116,28 @@ textarea {
   width: 100%;
 }
 
+.command-button:focus-visible,
+.danger-dialog button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.danger-button {
+  border-color: rgba(248, 113, 113, 0.62);
+  background: #3a1d24;
+  color: #fee2e2;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: rgba(252, 165, 165, 0.86);
+  background: #4b2028;
+}
+
+.command-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .segmented-group {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -626,6 +648,58 @@ textarea {
 .error-text {
   color: #fca5a5;
 }
+
+.danger-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: 8px;
+  padding: 18px;
+  background: #151b24;
+  color: #eef2f7;
+  overflow: auto;
+}
+
+.danger-dialog::backdrop {
+  background: rgba(2, 6, 12, 0.68);
+}
+
+.danger-dialog form {
+  display: grid;
+  gap: 12px;
+}
+
+.danger-dialog h2,
+.danger-dialog p {
+  margin: 0;
+}
+
+.dialog-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.dialog-details div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.dialog-details dt {
+  color: #94a3b8;
+}
+
+.dialog-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 .analysis-column {
   display: grid;
   grid-template-rows: minmax(520px, 68vh) auto;
@@ -815,6 +889,11 @@ textarea {
   }
 
   .telemetry-chart-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-actions,
+  .dialog-details div {
     grid-template-columns: 1fr;
   }
 }
