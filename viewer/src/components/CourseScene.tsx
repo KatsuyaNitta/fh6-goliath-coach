@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { BoundaryMarker, ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
 import { POINT, SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
 import {
+  referencePointsToOverviewTarget,
   referencePointToRenderVector,
   referencePointsToRenderBounds,
   type RenderBounds,
@@ -60,9 +61,13 @@ export function CourseScene({
     () => referencePointsToRenderBounds(reference.points, elevationScale, baselineDisplayY),
     [baselineDisplayY, reference.points, elevationScale],
   );
+  const overviewTarget = useMemo(
+    () => referencePointsToOverviewTarget(reference.points, elevationScale, baselineDisplayY),
+    [baselineDisplayY, reference.points, elevationScale],
+  );
   const cameraPosition = useMemo(
-    () => (viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds)),
-    [bounds, viewMode],
+    () => (viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds, overviewTarget)),
+    [bounds, overviewTarget, viewMode],
   );
 
   return (
@@ -71,6 +76,7 @@ export function CourseScene({
       <SceneCamera
         bounds={bounds}
         cameraPosition={cameraPosition}
+        overviewTarget={overviewTarget}
         viewMode={viewMode}
       />
       <ambientLight intensity={0.85} />
@@ -98,7 +104,7 @@ export function CourseScene({
         onSelectRewindCluster={onSelectRewindCluster}
         activeTelemetryPoint={activeTelemetryPoint}
       />
-      <SceneControls bounds={bounds} cameraPosition={cameraPosition} viewMode={viewMode} />
+      <SceneControls bounds={bounds} cameraPosition={cameraPosition} overviewTarget={overviewTarget} viewMode={viewMode} />
     </Canvas>
   );
 }
@@ -106,10 +112,12 @@ export function CourseScene({
 function SceneCamera({
   bounds,
   cameraPosition,
+  overviewTarget,
   viewMode,
 }: {
   bounds: RenderBounds;
   cameraPosition: [number, number, number];
+  overviewTarget: [number, number, number];
   viewMode: ViewMode;
 }) {
   const topDownRef = useRef<THREE.OrthographicCamera | null>(null);
@@ -120,10 +128,10 @@ function SceneCamera({
     if (!camera) {
       return;
     }
-    applyCameraPose(camera, cameraPosition, bounds.center, viewMode);
+    applyCameraPose(camera, cameraPosition, viewMode === "2d" ? bounds.center : overviewTarget, viewMode);
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
-  }, [bounds.center, cameraPosition, viewMode]);
+  }, [bounds.center, cameraPosition, overviewTarget, viewMode]);
 
   if (viewMode === "2d") {
     const halfSize = bounds.size * 0.55;
@@ -159,10 +167,12 @@ function SceneCamera({
 function SceneControls({
   bounds,
   cameraPosition,
+  overviewTarget,
   viewMode,
 }: {
   bounds: RenderBounds;
   cameraPosition: [number, number, number];
+  overviewTarget: [number, number, number];
   viewMode: ViewMode;
 }) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls> | null>(null);
@@ -172,10 +182,11 @@ function SceneControls({
     if (!controls) {
       return;
     }
-    applyCameraPose(controls.object, cameraPosition, bounds.center, viewMode);
-    controls.target.set(...bounds.center);
+    const target = viewMode === "2d" ? bounds.center : overviewTarget;
+    applyCameraPose(controls.object, cameraPosition, target, viewMode);
+    controls.target.set(...target);
     controls.update();
-  }, [bounds.center, cameraPosition, viewMode]);
+  }, [bounds.center, cameraPosition, overviewTarget, viewMode]);
 
   return (
     <OrbitControls
@@ -183,7 +194,7 @@ function SceneControls({
       enableRotate={viewMode === "3d"}
       enablePan
       enableZoom
-      target={bounds.center}
+      target={viewMode === "2d" ? bounds.center : overviewTarget}
       minPolarAngle={viewMode === "3d" ? 0.15 : 0}
       maxPolarAngle={viewMode === "3d" ? Math.PI / 2 - 0.03 : Math.PI}
       maxDistance={100000}

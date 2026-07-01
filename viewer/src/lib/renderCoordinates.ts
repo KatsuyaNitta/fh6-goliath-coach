@@ -45,3 +45,40 @@ export function referencePointsToRenderBounds(
     size: Math.max(size.x, size.y, size.z),
   };
 }
+
+export function referencePointsToOverviewTarget(
+  points: ReferencePointTuple[],
+  elevationScale: number,
+  baselineDisplayY = 0,
+): [number, number, number] {
+  if (points.length === 0) {
+    return [0, 0, 0];
+  }
+  if (points.length === 1) {
+    const point = referencePointToRenderVector(points[0], elevationScale, baselineDisplayY);
+    return [point.x, point.y, point.z];
+  }
+
+  const weighted = new THREE.Vector3();
+  let totalWeight = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const weight = Math.max(0, current[POINT.courseDistanceM] - previous[POINT.courseDistanceM]);
+    if (weight <= 0) {
+      continue;
+    }
+    const previousVector = referencePointToRenderVector(previous, elevationScale, baselineDisplayY);
+    const currentVector = referencePointToRenderVector(current, elevationScale, baselineDisplayY);
+    weighted.add(previousVector.add(currentVector).multiplyScalar(0.5 * weight));
+    totalWeight += weight;
+  }
+
+  if (totalWeight <= 0) {
+    const fallback = referencePointToRenderVector(points[0], elevationScale, baselineDisplayY);
+    return [fallback.x, fallback.y, fallback.z];
+  }
+
+  weighted.divideScalar(totalWeight);
+  return [weighted.x, weighted.y, weighted.z];
+}

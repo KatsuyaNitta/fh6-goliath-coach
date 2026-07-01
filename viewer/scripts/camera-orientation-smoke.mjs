@@ -32,10 +32,10 @@ const payload = JSON.parse(
 const columns = Object.fromEntries(payload.point_columns.map((name, index) => [name, index]));
 const baselineDisplayY = payload.coordinate_system.relative_elevation.baseline_display_y;
 
-function renderPoint(point) {
+function renderPoint(point, elevationScale = 1) {
   return new THREE.Vector3(
     point[columns.display_x],
-    point[columns.display_y] - baselineDisplayY,
+    (point[columns.display_y] - baselineDisplayY) * elevationScale,
     -point[columns.display_z],
   );
 }
@@ -48,6 +48,23 @@ function nearestPoint(distanceM) {
   payload.points[0]);
 }
 
+function overviewTarget(points, elevationScale = 1) {
+  const weighted = new THREE.Vector3();
+  let totalWeight = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const weight = Math.max(0, current[columns.course_distance_m] - previous[columns.course_distance_m]);
+    if (weight <= 0) {
+      continue;
+    }
+    const midpoint = renderPoint(previous, elevationScale).add(renderPoint(current, elevationScale)).multiplyScalar(0.5);
+    weighted.add(midpoint.multiplyScalar(weight));
+    totalWeight += weight;
+  }
+  return weighted.divideScalar(totalWeight);
+}
+
 const box = new THREE.Box3().setFromPoints(payload.points.map(renderPoint));
 const center = new THREE.Vector3();
 const sizeVector = new THREE.Vector3();
@@ -58,18 +75,31 @@ const bounds = {
   size: Math.max(sizeVector.x, sizeVector.y, sizeVector.z),
 };
 
-const cameraPosition = getCanonical3DAnalysisCameraPosition(bounds);
-assert.equal(cameraPosition[0], bounds.center[0]);
-assert.ok(cameraPosition[2] > bounds.center[2], "3D camera must be on positive render-Z side");
+const target = overviewTarget(payload.points);
+const targetTuple = [target.x, target.y, target.z];
+const cameraPosition = getCanonical3DAnalysisCameraPosition(bounds, targetTuple);
+assert.equal(cameraPosition[0], targetTuple[0]);
+assert.equal(cameraPosition[2], targetTuple[2] + bounds.size * 0.9);
+assert.notEqual(Math.round(targetTuple[0]), Math.round(bounds.center[0]), "overview target should not blindly use bounds center");
+assert.notEqual(Math.round(targetTuple[2]), Math.round(bounds.center[2]), "overview target should not blindly use bounds center");
+assert.ok(cameraPosition[2] > targetTuple[2], "3D camera must be on positive render-Z side of the overview target");
 assert.ok(
-  cameraPosition[2] - bounds.center[2] > cameraPosition[1] - bounds.center[1],
+  cameraPosition[2] - targetTuple[2] > cameraPosition[1] - targetTuple[1],
   "3D reset camera should use a low oblique turntable view",
 );
+
+const maximumElevationPoint = renderPoint(nearestPoint(payload.coordinate_system.relative_elevation.maximum_course_distance_m));
+assert.notEqual(Math.round(target.x), Math.round(maximumElevationPoint.x), "overview target X should not collapse to maximum-elevation point");
+assert.notEqual(Math.round(target.z), Math.round(maximumElevationPoint.z), "overview target Z should not collapse to maximum-elevation point");
+
+const scaledTarget = overviewTarget(payload.points, 5);
+assert.equal(Math.round(scaledTarget.x), Math.round(target.x), "elevation scaling must not move overview target X");
+assert.equal(Math.round(scaledTarget.z), Math.round(target.z), "elevation scaling must not move overview target Z");
 
 const camera = new THREE.PerspectiveCamera(45, 16 / 9, 1, 200000);
 camera.position.set(...cameraPosition);
 camera.up.set(...getCameraUpVector("3d"));
-camera.lookAt(...bounds.center);
+camera.lookAt(...targetTuple);
 camera.updateProjectionMatrix();
 camera.updateMatrixWorld(true);
 

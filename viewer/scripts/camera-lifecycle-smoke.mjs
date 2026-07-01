@@ -82,6 +82,9 @@ assert.doesNotMatch(appSource, /key=\{`\$\{viewMode\}-\$\{cameraResetKey\}`\}/, 
 
 const sceneSource = await readFile(new URL("../src/components/CourseScene.tsx", import.meta.url), "utf-8");
 assert.match(sceneSource, /const cameraPosition = useMemo/, "camera position should be memoized across selection rerenders");
+assert.match(sceneSource, /referencePointsToOverviewTarget/, "3D overview target should be computed separately from bounds");
+assert.match(sceneSource, /getCanonical3DAnalysisCameraPosition\(bounds, overviewTarget\)/, "3D camera should be positioned around the overview target");
+assert.match(sceneSource, /viewMode === "2d" \? bounds\.center : overviewTarget/, "2D should keep bounds center while 3D uses overview target");
 assert.match(sceneSource, /onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/, "rewind marker pointer events should not bubble into scene controls");
 
 console.log("camera lifecycle smoke test passed");
