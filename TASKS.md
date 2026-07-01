@@ -50,6 +50,7 @@
 - [x] Selected section boundary markers are emphasized.
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
 - [x] Overview map mode frames the full course, renders S1-S6 with equal emphasis, uses slow 3D automatic rotation, and stops rotation on manual camera interaction.
+- [x] Section Focus uses deterministic section-specific 3D camera framing and mode-aware Reset camera.
 
 ## Milestone B1
 
@@ -224,7 +225,8 @@
 - [x] Selected section boundary markers are emphasized.
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
 - [x] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
-- [ ] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover/pin does not move camera.
+- [x] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover does not move camera; same-section chart pin preserves manual camera composition.
+- [ ] Corner Focus camera mode and corner-specific framing.
 - [x] Show section start/end/length.
 - [x] Add loading and error states.
 

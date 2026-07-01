@@ -1,4 +1,4 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from "@react-three/drei";
 import { useEffect, useMemo, useRef, type ElementRef } from "react";
 import * as THREE from "three";
@@ -13,6 +13,7 @@ import {
 import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCameraPosition } from "../lib/cameraFraming";
 import { OVERVIEW_AUTO_ROTATE_SPEED, type MapDisplayMode } from "../lib/mapDisplayMode";
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
+import { getSectionFocusCameraPose } from "../lib/sectionFocusCamera";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 
 const MUTED_SECTION_COLOR = "#343b44";
@@ -30,6 +31,10 @@ const BASE_PLANE_MARGIN = 1800;
 const GUIDE_DEDUP_DISTANCE_M = 1;
 
 type ViewMode = "2d" | "3d";
+interface SectionFocusRequest {
+  sectionId: SectionId;
+  requestId: number;
+}
 
 interface CourseSceneProps {
   reference: ReferencePayload;
@@ -38,6 +43,7 @@ interface CourseSceneProps {
   mapDisplayMode: MapDisplayMode;
   viewMode: ViewMode;
   overviewAutoRotate: boolean;
+  sectionFocusRequest?: SectionFocusRequest | null;
   projectedLap?: ProjectedLapPayload | null;
   showReference: boolean;
   showActual: boolean;
@@ -56,6 +62,7 @@ export function CourseScene({
   mapDisplayMode,
   viewMode,
   overviewAutoRotate,
+  sectionFocusRequest,
   projectedLap,
   showReference,
   showActual,
@@ -119,8 +126,12 @@ export function CourseScene({
       <SceneControls
         bounds={bounds}
         cameraPosition={cameraPosition}
+        elevationScale={elevationScale}
+        baselineDisplayY={baselineDisplayY}
         overviewAutoRotate={overviewAutoRotate}
         overviewTarget={overviewTarget}
+        reference={reference}
+        sectionFocusRequest={sectionFocusRequest}
         viewMode={viewMode}
         onManualCameraInteraction={onManualCameraInteraction}
       />
@@ -187,19 +198,29 @@ function SceneCamera({
 function SceneControls({
   bounds,
   cameraPosition,
+  elevationScale,
+  baselineDisplayY,
   overviewAutoRotate,
   overviewTarget,
+  reference,
+  sectionFocusRequest,
   viewMode,
   onManualCameraInteraction,
 }: {
   bounds: RenderBounds;
   cameraPosition: [number, number, number];
+  elevationScale: number;
+  baselineDisplayY: number;
   overviewAutoRotate: boolean;
   overviewTarget: [number, number, number];
+  reference: ReferencePayload;
+  sectionFocusRequest?: SectionFocusRequest | null;
   viewMode: ViewMode;
   onManualCameraInteraction: () => void;
 }) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls> | null>(null);
+  const size = useThree((state) => state.size);
+  const appliedSectionFocusRequestRef = useRef<number | null>(null);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -225,11 +246,44 @@ function SceneControls({
     if (!controls) {
       return;
     }
+    if (
+      viewMode === "3d" &&
+      sectionFocusRequest &&
+      appliedSectionFocusRequestRef.current === sectionFocusRequest.requestId
+    ) {
+      return;
+    }
     const target = viewMode === "2d" ? bounds.center : overviewTarget;
     applyCameraPose(controls.object, cameraPosition, target, viewMode);
     controls.target.set(...target);
     controls.update();
-  }, [bounds.center, cameraPosition, overviewTarget, viewMode]);
+  }, [bounds.center, cameraPosition, overviewTarget, sectionFocusRequest, viewMode]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls || !sectionFocusRequest || viewMode !== "3d") {
+      return;
+    }
+    if (appliedSectionFocusRequestRef.current === sectionFocusRequest.requestId) {
+      return;
+    }
+    const pose = getSectionFocusCameraPose({
+      reference,
+      sectionId: sectionFocusRequest.sectionId,
+      elevationScale,
+      baselineDisplayY,
+      overviewTarget,
+      fullBounds: bounds,
+      aspect: size.width / Math.max(1, size.height),
+    });
+    if (!pose) {
+      return;
+    }
+    applyCameraPose(controls.object, pose.position, pose.target, "3d");
+    controls.target.set(...pose.target);
+    controls.update();
+    appliedSectionFocusRequestRef.current = sectionFocusRequest.requestId;
+  }, [baselineDisplayY, bounds, elevationScale, overviewTarget, reference, sectionFocusRequest, size.height, size.width, viewMode]);
 
   return (
     <OrbitControls

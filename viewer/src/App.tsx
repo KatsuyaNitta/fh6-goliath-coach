@@ -12,6 +12,10 @@ import { sectionForRewindSelection } from "./lib/rewindSelection";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 
 type ViewMode = "3d" | "2d";
+interface SectionFocusRequest {
+  sectionId: SectionId;
+  requestId: number;
+}
 
 export function App() {
   const [reference, setReference] = useState<ReferencePayload | null>(null);
@@ -20,6 +24,7 @@ export function App() {
   const [elevationScale, setElevationScale] = useState(5);
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
   const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>(INITIAL_MAP_DISPLAY_MODE);
+  const [sectionFocusRequest, setSectionFocusRequest] = useState<SectionFocusRequest | null>(null);
   const [overviewRotationStopped, setOverviewRotationStopped] = useState(false);
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
@@ -81,12 +86,40 @@ export function App() {
   function activateSectionFocusMode(): void {
     setMapDisplayMode("section-focus");
     setOverviewRotationStopped(true);
+    requestSectionFocusCamera(selectedSectionId);
   }
 
   function selectSectionForFocus(sectionId: SectionId): void {
     setSelectedSectionId(sectionId);
     setMapDisplayMode("section-focus");
     setOverviewRotationStopped(true);
+    requestSectionFocusCamera(sectionId);
+  }
+
+  function selectSectionForChartPin(sectionId: SectionId): void {
+    const shouldRequestFocusCamera = mapDisplayMode !== "section-focus" || selectedSectionId !== sectionId;
+    setSelectedSectionId(sectionId);
+    setMapDisplayMode("section-focus");
+    setOverviewRotationStopped(true);
+    if (shouldRequestFocusCamera) {
+      requestSectionFocusCamera(sectionId);
+    }
+  }
+
+  function requestSectionFocusCamera(sectionId: SectionId): void {
+    setSectionFocusRequest((current) => ({
+      sectionId,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+  }
+
+  function resetCamera(): void {
+    if (mapDisplayMode === "section-focus") {
+      setOverviewRotationStopped(true);
+      requestSectionFocusCamera(selectedSectionId);
+      return;
+    }
+    setCameraResetKey((key) => key + 1);
   }
 
   function selectRewindCluster(cluster: RewindClusterPayload | undefined): void {
@@ -171,6 +204,7 @@ export function App() {
               mapDisplayMode={mapDisplayMode}
               viewMode={viewMode}
               overviewAutoRotate={overviewAutoRotate}
+              sectionFocusRequest={sectionFocusRequest}
               projectedLap={projectedLap}
               showReference={showReference}
               showActual={showActual}
@@ -194,7 +228,7 @@ export function App() {
           onHoverTelemetryPoint={setHoveredTelemetryPoint}
           onPinTelemetryPoint={setPinnedTelemetryPoint}
           onSelectRewindCluster={selectRewindCluster}
-          onSelectSection={selectSectionForFocus}
+          onSelectSection={selectSectionForChartPin}
           pinnedTelemetryPoint={pinnedTelemetryPoint}
           projectedLap={projectedLap}
           reference={reference}
@@ -247,7 +281,7 @@ export function App() {
           </button>
         </div>
 
-        <button className="command-button" type="button" onClick={() => setCameraResetKey((key) => key + 1)}>
+        <button className="command-button" type="button" onClick={resetCamera}>
           Reset camera
         </button>
 
