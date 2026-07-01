@@ -4,6 +4,7 @@ await import("./render-coordinate-smoke.mjs");
 await import("./relative-elevation-smoke.mjs");
 await import("./camera-orientation-smoke.mjs");
 await import("./camera-lifecycle-smoke.mjs");
+await import("./map-display-mode-smoke.mjs");
 await import("./rewind-selection-smoke.mjs");
 await import("./telemetry-lap-smoke.mjs");
 await import("./session-api-smoke.mjs");

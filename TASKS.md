@@ -49,6 +49,7 @@
 - [x] Non-selected sections are gray and dimmed.
 - [x] Selected section boundary markers are emphasized.
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
+- [x] Overview map mode frames the full course, renders S1-S6 with equal emphasis, uses slow 3D automatic rotation, and stops rotation on manual camera interaction.
 
 ## Milestone B1
 
@@ -222,7 +223,8 @@
 - [x] Non-selected sections are gray and dimmed.
 - [x] Selected section boundary markers are emphasized.
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
-- [ ] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
+- [x] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
+- [ ] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover/pin does not move camera.
 - [x] Show section start/end/length.
 - [x] Add loading and error states.
 

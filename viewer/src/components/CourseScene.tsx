@@ -11,12 +11,16 @@ import {
   type RenderBounds,
 } from "../lib/renderCoordinates";
 import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCameraPosition } from "../lib/cameraFraming";
+import { OVERVIEW_AUTO_ROTATE_SPEED, type MapDisplayMode } from "../lib/mapDisplayMode";
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 
 const MUTED_SECTION_COLOR = "#343b44";
 const MUTED_MARKER_COLOR = "#7b8490";
 const NON_SELECTED_OPACITY = 0.26;
+const OVERVIEW_LINE_OPACITY = 1;
+const OVERVIEW_REFERENCE_WIDTH = 5;
+const OVERVIEW_ACTUAL_WIDTH = 7;
 const SELECTED_REFERENCE_WIDTH = 9;
 const SELECTED_ACTUAL_WIDTH = 11;
 const REFERENCE_HALO_WIDTH = 17;
@@ -31,7 +35,9 @@ interface CourseSceneProps {
   reference: ReferencePayload;
   elevationScale: number;
   selectedSectionId: SectionId;
+  mapDisplayMode: MapDisplayMode;
   viewMode: ViewMode;
+  overviewAutoRotate: boolean;
   projectedLap?: ProjectedLapPayload | null;
   showReference: boolean;
   showActual: boolean;
@@ -39,6 +45,7 @@ interface CourseSceneProps {
   showRewinds: boolean;
   selectedRewindClusterId: string;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
+  onManualCameraInteraction: () => void;
   activeTelemetryPoint?: ProjectedLapPoint | null;
 }
 
@@ -46,7 +53,9 @@ export function CourseScene({
   reference,
   elevationScale,
   selectedSectionId,
+  mapDisplayMode,
   viewMode,
+  overviewAutoRotate,
   projectedLap,
   showReference,
   showActual,
@@ -54,6 +63,7 @@ export function CourseScene({
   showRewinds,
   selectedRewindClusterId,
   onSelectRewindCluster,
+  onManualCameraInteraction,
   activeTelemetryPoint,
 }: CourseSceneProps) {
   const baselineDisplayY = reference.coordinate_system.relative_elevation.baseline_display_y;
@@ -71,7 +81,8 @@ export function CourseScene({
   );
 
   return (
-    <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
+    <div className="course-canvas-wrap" onPointerDown={onManualCameraInteraction} onWheel={onManualCameraInteraction}>
+      <Canvas dpr={[1, 2]} gl={{ antialias: true }}>
       <color attach="background" args={["#101318"]} />
       <SceneCamera
         bounds={bounds}
@@ -97,6 +108,7 @@ export function CourseScene({
         elevationScale={elevationScale}
         baselineDisplayY={baselineDisplayY}
         selectedSectionId={selectedSectionId}
+        mapDisplayMode={mapDisplayMode}
         showReference={showReference}
         showActual={showActual}
         showRewinds={showRewinds}
@@ -104,8 +116,16 @@ export function CourseScene({
         onSelectRewindCluster={onSelectRewindCluster}
         activeTelemetryPoint={activeTelemetryPoint}
       />
-      <SceneControls bounds={bounds} cameraPosition={cameraPosition} overviewTarget={overviewTarget} viewMode={viewMode} />
-    </Canvas>
+      <SceneControls
+        bounds={bounds}
+        cameraPosition={cameraPosition}
+        overviewAutoRotate={overviewAutoRotate}
+        overviewTarget={overviewTarget}
+        viewMode={viewMode}
+        onManualCameraInteraction={onManualCameraInteraction}
+      />
+      </Canvas>
+    </div>
   );
 }
 
@@ -167,15 +187,38 @@ function SceneCamera({
 function SceneControls({
   bounds,
   cameraPosition,
+  overviewAutoRotate,
   overviewTarget,
   viewMode,
+  onManualCameraInteraction,
 }: {
   bounds: RenderBounds;
   cameraPosition: [number, number, number];
+  overviewAutoRotate: boolean;
   overviewTarget: [number, number, number];
   viewMode: ViewMode;
+  onManualCameraInteraction: () => void;
 }) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls> | null>(null);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) {
+      return;
+    }
+    controls.addEventListener("start", onManualCameraInteraction);
+    return () => controls.removeEventListener("start", onManualCameraInteraction);
+  }, [onManualCameraInteraction]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) {
+      return;
+    }
+    controls.autoRotate = overviewAutoRotate;
+    controls.autoRotateSpeed = OVERVIEW_AUTO_ROTATE_SPEED;
+    controls.update();
+  }, [overviewAutoRotate]);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -191,6 +234,8 @@ function SceneControls({
   return (
     <OrbitControls
       ref={controlsRef}
+      autoRotate={overviewAutoRotate}
+      autoRotateSpeed={OVERVIEW_AUTO_ROTATE_SPEED}
       enableRotate={viewMode === "3d"}
       enablePan
       enableZoom
@@ -199,6 +244,7 @@ function SceneControls({
       maxPolarAngle={viewMode === "3d" ? Math.PI / 2 - 0.03 : Math.PI}
       maxDistance={100000}
       minDistance={1500}
+      onStart={onManualCameraInteraction}
     />
   );
 }
@@ -332,6 +378,7 @@ function CourseLines({
   elevationScale,
   baselineDisplayY,
   selectedSectionId,
+  mapDisplayMode,
   showReference,
   showActual,
   showRewinds,
@@ -344,6 +391,7 @@ function CourseLines({
   elevationScale: number;
   baselineDisplayY: number;
   selectedSectionId: SectionId;
+  mapDisplayMode: MapDisplayMode;
   showReference: boolean;
   showActual: boolean;
   showRewinds: boolean;
@@ -390,17 +438,18 @@ function CourseLines({
         const points = sectionPoints.get(section.id) ?? [];
         const renderedPoints = points.map((point) => referencePointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
+        const isOverview = mapDisplayMode === "overview";
         const mainLine = (
           <Line
             key={section.id}
             points={renderedPoints}
-            color={isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
-            lineWidth={isSelected ? SELECTED_REFERENCE_WIDTH : MUTED_LINE_WIDTH}
+            color={isOverview || isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
+            lineWidth={isOverview ? OVERVIEW_REFERENCE_WIDTH : isSelected ? SELECTED_REFERENCE_WIDTH : MUTED_LINE_WIDTH}
             transparent
-            opacity={isSelected ? 1 : NON_SELECTED_OPACITY}
+            opacity={isOverview || isSelected ? OVERVIEW_LINE_OPACITY : NON_SELECTED_OPACITY}
           />
         );
-        if (!isSelected) {
+        if (isOverview || !isSelected) {
           return [mainLine];
         }
         return [
@@ -422,17 +471,18 @@ function CourseLines({
         }
         const renderedPoints = points.map((point) => projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
+        const isOverview = mapDisplayMode === "overview";
         const mainLine = (
           <Line
             key={`actual-${section.id}`}
             points={renderedPoints}
-            color={isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
-            lineWidth={isSelected ? SELECTED_ACTUAL_WIDTH : MUTED_LINE_WIDTH}
+            color={isOverview || isSelected ? SECTION_COLORS[section.id] : MUTED_SECTION_COLOR}
+            lineWidth={isOverview ? OVERVIEW_ACTUAL_WIDTH : isSelected ? SELECTED_ACTUAL_WIDTH : MUTED_LINE_WIDTH}
             transparent
-            opacity={isSelected ? 1 : NON_SELECTED_OPACITY}
+            opacity={isOverview || isSelected ? OVERVIEW_LINE_OPACITY : NON_SELECTED_OPACITY}
           />
         );
-        if (!isSelected) {
+        if (isOverview || !isSelected) {
           return [mainLine];
         }
         return [
@@ -448,7 +498,7 @@ function CourseLines({
         ];
       }) : null}
       {markerPoints.map(({ marker, point }) => {
-        const isBoundary = markerTouchesSection(marker, selectedSectionId);
+        const isBoundary = mapDisplayMode === "overview" ? true : markerTouchesSection(marker, selectedSectionId);
         return (
           <Marker
             color={isBoundary ? "#ffffff" : MUTED_MARKER_COLOR}
@@ -464,7 +514,9 @@ function CourseLines({
         );
       })}
       {showActual && projectedLap ? projectedLap.markers.map((point) => {
-        const isBoundary = actualMarkerTouchesSection(reference, point.manualMarkerId, selectedSectionId);
+        const isBoundary = mapDisplayMode === "overview"
+          ? true
+          : actualMarkerTouchesSection(reference, point.manualMarkerId, selectedSectionId);
         return (
           <Marker
             color={isBoundary ? "#f8fafc" : MUTED_MARKER_COLOR}

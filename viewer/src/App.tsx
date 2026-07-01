@@ -7,7 +7,9 @@ import { SessionBrowserPanel } from "./components/SessionBrowserPanel";
 import { TelemetryChartsPanel } from "./components/TelemetryChartsPanel";
 import { classificationLabel, parseProjectedLapCsv, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
+import { INITIAL_MAP_DISPLAY_MODE, shouldAutoRotateOverview, type MapDisplayMode } from "./lib/mapDisplayMode";
 import { sectionForRewindSelection } from "./lib/rewindSelection";
+import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 
 type ViewMode = "3d" | "2d";
 
@@ -17,6 +19,8 @@ export function App() {
   const [selectedSectionId, setSelectedSectionId] = useState<SectionId>("S1");
   const [elevationScale, setElevationScale] = useState(5);
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
+  const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>(INITIAL_MAP_DISPLAY_MODE);
+  const [overviewRotationStopped, setOverviewRotationStopped] = useState(false);
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
   const [loadedSessionId, setLoadedSessionId] = useState("");
@@ -30,6 +34,7 @@ export function App() {
   const [hoveredTelemetryPoint, setHoveredTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
   const [pinnedTelemetryPoint, setPinnedTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
   const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     fetchReference()
@@ -60,6 +65,29 @@ export function App() {
   }, [projectedLap, selectedRewindEventId]);
   const selectedRewindDetailPoint = selectedRewindEvent ?? selectedRewindCluster?.points[0];
   const activeTelemetryPoint = hoveredTelemetryPoint ?? pinnedTelemetryPoint;
+  const overviewAutoRotate = shouldAutoRotateOverview({
+    viewMode,
+    mapDisplayMode,
+    overviewRotationStopped,
+    prefersReducedMotion,
+  });
+
+  function activateOverviewMode(): void {
+    setMapDisplayMode("overview");
+    setOverviewRotationStopped(prefersReducedMotion);
+    setCameraResetKey((key) => key + 1);
+  }
+
+  function activateSectionFocusMode(): void {
+    setMapDisplayMode("section-focus");
+    setOverviewRotationStopped(true);
+  }
+
+  function selectSectionForFocus(sectionId: SectionId): void {
+    setSelectedSectionId(sectionId);
+    setMapDisplayMode("section-focus");
+    setOverviewRotationStopped(true);
+  }
 
   function selectRewindCluster(cluster: RewindClusterPayload | undefined): void {
     if (!cluster) {
@@ -140,7 +168,9 @@ export function App() {
               reference={reference}
               elevationScale={elevationScale}
               selectedSectionId={selectedSectionId}
+              mapDisplayMode={mapDisplayMode}
               viewMode={viewMode}
+              overviewAutoRotate={overviewAutoRotate}
               projectedLap={projectedLap}
               showReference={showReference}
               showActual={showActual}
@@ -148,6 +178,7 @@ export function App() {
               showRewinds={showRewinds && Boolean(projectedLap?.rewindClusters.length)}
               selectedRewindClusterId={selectedRewindClusterId}
               onSelectRewindCluster={selectRewindCluster}
+              onManualCameraInteraction={() => setOverviewRotationStopped(true)}
               activeTelemetryPoint={activeTelemetryPoint}
             />
             <div className="orientation-indicator" aria-label="Map orientation">
@@ -163,7 +194,7 @@ export function App() {
           onHoverTelemetryPoint={setHoveredTelemetryPoint}
           onPinTelemetryPoint={setPinnedTelemetryPoint}
           onSelectRewindCluster={selectRewindCluster}
-          onSelectSection={setSelectedSectionId}
+          onSelectSection={selectSectionForFocus}
           pinnedTelemetryPoint={pinnedTelemetryPoint}
           projectedLap={projectedLap}
           reference={reference}
@@ -181,6 +212,7 @@ export function App() {
         <div className="control-row">
           <button
             className={viewMode === "3d" ? "active" : ""}
+            aria-pressed={viewMode === "3d"}
             type="button"
             onClick={() => setViewMode("3d")}
           >
@@ -188,10 +220,30 @@ export function App() {
           </button>
           <button
             className={viewMode === "2d" ? "active" : ""}
+            aria-pressed={viewMode === "2d"}
             type="button"
             onClick={() => setViewMode("2d")}
           >
             2D
+          </button>
+        </div>
+
+        <div className="segmented-group two-up" aria-label="Map display mode">
+          <button
+            className={mapDisplayMode === "overview" ? "active" : ""}
+            aria-pressed={mapDisplayMode === "overview"}
+            type="button"
+            onClick={activateOverviewMode}
+          >
+            Overview
+          </button>
+          <button
+            className={mapDisplayMode === "section-focus" ? "active" : ""}
+            aria-pressed={mapDisplayMode === "section-focus"}
+            type="button"
+            onClick={activateSectionFocusMode}
+          >
+            Section Focus
           </button>
         </div>
 
@@ -416,7 +468,7 @@ export function App() {
               className={section.id === selectedSectionId ? "section-button selected" : "section-button"}
               key={section.id}
               type="button"
-              onClick={() => setSelectedSectionId(section.id)}
+              onClick={() => selectSectionForFocus(section.id)}
             >
               <span style={{ backgroundColor: SECTION_COLORS[section.id] }} />
               <b>{section.id}</b>

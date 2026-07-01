@@ -72,6 +72,8 @@ box.getCenter(center);
 box.getSize(sizeVector);
 const bounds = {
   center: [center.x, center.y, center.z],
+  min: [box.min.x, box.min.y, box.min.z],
+  max: [box.max.x, box.max.y, box.max.z],
   size: Math.max(sizeVector.x, sizeVector.y, sizeVector.z),
 };
 
@@ -79,7 +81,7 @@ const target = overviewTarget(payload.points);
 const targetTuple = [target.x, target.y, target.z];
 const cameraPosition = getCanonical3DAnalysisCameraPosition(bounds, targetTuple);
 assert.equal(cameraPosition[0], targetTuple[0]);
-assert.equal(cameraPosition[2], targetTuple[2] + bounds.size * 0.9);
+assert.ok(cameraPosition[2] > targetTuple[2] + bounds.size * 0.9);
 assert.notEqual(Math.round(targetTuple[0]), Math.round(bounds.center[0]), "overview target should not blindly use bounds center");
 assert.notEqual(Math.round(targetTuple[2]), Math.round(bounds.center[2]), "overview target should not blindly use bounds center");
 assert.ok(cameraPosition[2] > targetTuple[2], "3D camera must be on positive render-Z side of the overview target");

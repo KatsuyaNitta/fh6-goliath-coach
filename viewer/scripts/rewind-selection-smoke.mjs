@@ -83,8 +83,8 @@ assert.match(appSource, /function selectRewindEvent[\s\S]*sectionForRewindSelect
 assert.match(appSource, /onClick=\{\(\) => selectRewindCluster\(cluster\)\}/, "practice-focus button should use synced cluster selection");
 assert.match(appSource, /onClick=\{\(\) => selectRewindEvent\(point\)\}/, "detail event buttons should use synced event selection");
 assert.match(appSource, /function clearRewindSelection[\s\S]*setSelectedRewindClusterId\(""\)[\s\S]*setSelectedRewindEventId\(""\)/, "clear selection should only clear rewind selection state");
-assert.match(appSource, /onClick=\{\(\) => setSelectedSectionId\(section\.id\)\}/, "manual section buttons should not automatically select a rewind");
-assert.doesNotMatch(appSource, /onClick=\{\(\) => setSelectedSectionId\(section\.id\)[\s\S]*setSelectedRewindClusterId/, "manual section selection should remain one-way only");
+assert.match(appSource, /onClick=\{\(\) => selectSectionForFocus\(section\.id\)\}/, "manual section buttons should enter explicit section focus");
+assert.doesNotMatch(appSource, /onClick=\{\(\) => selectSectionForFocus\(section\.id\)[\s\S]*setSelectedRewindClusterId/, "manual section selection should remain one-way only");
 
 const sceneSource = await readFile(new URL("../src/components/CourseScene.tsx", import.meta.url), "utf-8");
 assert.match(sceneSource, /onSelect\(cluster\)/, "scene marker selection should pass the cluster payload to the synced callback");

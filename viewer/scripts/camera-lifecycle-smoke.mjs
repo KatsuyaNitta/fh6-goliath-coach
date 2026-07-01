@@ -86,5 +86,11 @@ assert.match(sceneSource, /referencePointsToOverviewTarget/, "3D overview target
 assert.match(sceneSource, /getCanonical3DAnalysisCameraPosition\(bounds, overviewTarget\)/, "3D camera should be positioned around the overview target");
 assert.match(sceneSource, /viewMode === "2d" \? bounds\.center : overviewTarget/, "2D should keep bounds center while 3D uses overview target");
 assert.match(sceneSource, /onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/, "rewind marker pointer events should not bubble into scene controls");
+const lifecycleCall = appSource.slice(appSource.indexOf("const cameraLifecycleKey"), appSource.indexOf("}, [cameraResetKey"));
+assert.doesNotMatch(
+  lifecycleCall,
+  /selectedSectionId|activeTelemetryPoint|hoveredTelemetryPoint|pinnedTelemetryPoint|selectedRewindClusterId|selectedRewindEventId|mapDisplayMode/,
+  "analysis selection and display mode should not be implicit lifecycle reset inputs",
+);
 
 console.log("camera lifecycle smoke test passed");

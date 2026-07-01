@@ -140,7 +140,7 @@ assert.match(stylesSource, /grid-template-columns:\s*96px minmax\(0, 1fr\)/);
 assert.match(stylesSource, /@media \(max-width: 700px\)/);
 const desktopBreakpointBlock = stylesSource.match(/@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
 assert.doesNotMatch(desktopBreakpointBlock, /\.telemetry-chart-track[\s\S]*?grid-template-columns:\s*1fr/);
-assert.match(tasksSource, /- \[ \] Overview map mode:/);
+assert.match(tasksSource, /- \[x\] Overview map mode:/);
 assert.match(tasksSource, /slow automatic rotation/);
 assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/);
 const lifecycleCall = appSource.slice(appSource.indexOf("const cameraLifecycleKey"), appSource.indexOf("}, [cameraResetKey"));
