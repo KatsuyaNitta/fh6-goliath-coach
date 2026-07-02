@@ -10,6 +10,7 @@ await import("./camera-lifecycle-smoke.mjs");
 await import("./map-display-mode-smoke.mjs");
 await import("./section-focus-camera-smoke.mjs");
 await import("./rewind-selection-smoke.mjs");
+await import("./practice-focus-smoke.mjs");
 await import("./telemetry-lap-smoke.mjs");
 await import("./session-api-smoke.mjs");
 await import("./telemetry-chart-smoke.mjs");

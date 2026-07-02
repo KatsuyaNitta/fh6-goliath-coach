@@ -1,4 +1,5 @@
 import type { SectionId } from "./reference";
+import { buildPracticeFocusCandidates, type PracticeFocusCandidate } from "./practiceFocus";
 import { UI_TEXT } from "./uiText";
 
 export type RewindClassification = "external_impact_suspected" | "driving_error_suspected" | "undetermined" | "";
@@ -70,7 +71,7 @@ export interface RewindSummaryPayload {
   drivingErrorSuspectedCount: number;
   undeterminedCount: number;
   bySection: Record<SectionId, number>;
-  practiceFocus: RewindClusterPayload[];
+  practiceFocus: PracticeFocusCandidate[];
 }
 
 export interface ProjectedLapChannelAvailability {
@@ -243,17 +244,13 @@ function buildRewindSummary(clusters: RewindClusterPayload[]): RewindSummaryPayl
   for (const cluster of clusters) {
     bySection[cluster.sectionId] += cluster.eventCount;
   }
-  const practiceFocus = clusters
-    .filter((cluster) => cluster.drivingErrorSuspectedCount > 0 && ["high", "medium"].includes(cluster.confidence))
-    .sort((left, right) => right.drivingErrorSuspectedCount - left.drivingErrorSuspectedCount)
-    .slice(0, 3);
   return {
     rewindCount: sum(clusters.map((cluster) => cluster.eventCount)),
     externalImpactSuspectedCount: sum(clusters.map((cluster) => cluster.externalImpactSuspectedCount)),
     drivingErrorSuspectedCount: sum(clusters.map((cluster) => cluster.drivingErrorSuspectedCount)),
     undeterminedCount: sum(clusters.map((cluster) => cluster.undeterminedCount)),
     bySection,
-    practiceFocus,
+    practiceFocus: buildPracticeFocusCandidates(clusters),
   };
 }
 

@@ -230,6 +230,7 @@
 - [x] Active course source uses consistent Overview and Section Focus emphasis.
 - [x] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
 - [x] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover does not move camera; same-section chart pin preserves manual camera composition.
+- [x] Rewind markers, rewind events, and Practice Focus candidates enter Section Focus and reframe only when mode or section changes.
 - [ ] Corner Focus camera mode and corner-specific framing.
 - [x] Show section start/end/length.
 - [x] Add loading and error states.
@@ -305,6 +306,7 @@
 - [x] Display total lap time and selected-section time.
 - [x] Display actual P1-P5 markers.
 - [x] Highlight selected actual-lap segment.
+- [x] Extract explainable rewind-derived practice-focus candidates without a composite score.
 
 ## Tests
 

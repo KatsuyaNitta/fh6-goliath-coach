@@ -108,8 +108,13 @@ assert.match(appSource, /overviewAutoRotate=\{overviewAutoRotate\}/);
 assert.match(appSource, /sectionFocusRequest=\{sectionFocusRequest\}/);
 assert.match(appSource, /onSelectSection=\{selectSectionForChartPin\}/);
 assert.match(appSource, /onClick=\{\(\) => selectSectionForFocus\(section\.id\)\}/);
-assert.match(appSource, /setSelectedSectionId\(\(current\) => sectionForRewindSelection\(current, cluster\.sectionId\)\)/);
-assert.doesNotMatch(appSource, /selectRewindCluster[\s\S]*setMapDisplayMode/);
+assert.match(appSource, /function navigateToRewindSection\(sectionId: string \| undefined\)/);
+assert.match(appSource, /rewindNavigationDecision\(selectedSectionId, mapDisplayMode, sectionId\)/);
+assert.match(appSource, /setMapDisplayMode\("section-focus"\)/);
+assert.match(appSource, /setOverviewRotationStopped\(true\)/);
+assert.match(appSource, /if \(shouldReframe\) \{\s*requestSectionFocusCamera\(targetSectionId\);/s);
+assert.match(appSource, /selectRewindCluster[\s\S]*navigateToRewindSection\(cluster\.sectionId\)/);
+assert.match(appSource, /selectRewindEvent[\s\S]*navigateToRewindSection\(event\.sectionId\)/);
 assert.doesNotMatch(appSource, /onHoverTelemetryPoint=\{selectSectionForFocus\}/);
 assert.doesNotMatch(appSource, /setMode\("section"\)[\s\S]{0,160}setMapDisplayMode/);
 

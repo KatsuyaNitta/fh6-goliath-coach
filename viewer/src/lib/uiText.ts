@@ -156,6 +156,13 @@ export const UI_TEXT_CONTRACT = [
   { id: "UI-159", english: "Rear accel", text: "リア加速", decision: "translate" },
   { id: "UI-160", english: "Rear decel", text: "リア減速", decision: "translate" },
   { id: "UI-161", english: "Center balance", text: "センターバランス", decision: "translate" },
+  { id: "UI-162", english: "Mechanically extracts locations with at least two rewinds at the same point, or locations with medium-or-higher confidence driving-error suspicion.", text: "同じ地点で2回以上の巻き戻し、または中以上の信頼度で運転ミスが疑われる地点を機械抽出しています。", decision: "translate" },
+  { id: "UI-163", english: "No rewind cluster met the explicit practice-focus extraction criteria.", text: "この基準に該当する重点練習候補はありません。", decision: "translate" },
+  { id: "UI-164", english: "Selection reason", text: "選定理由", decision: "translate" },
+  { id: "UI-165", english: "Repeated rewind at the same point", text: "同じ地点で複数回", decision: "translate" },
+  { id: "UI-166", english: "Medium-or-higher confidence driving-error suspicion", text: "中以上の信頼度で運転ミス疑い", decision: "translate" },
+  { id: "UI-167", english: "High", text: "高", decision: "translate" },
+  { id: "UI-168", english: "Medium", text: "中", decision: "translate" },
 ] as const;
 
 export const KEEP_ENGLISH_TEXTS = [
@@ -222,7 +229,13 @@ export const UI_TEXT = {
   rewindEvents: "巻き戻しイベント",
   clearRewindSelection: "巻き戻し選択を解除",
   practiceFocus: "重点練習箇所",
-  noPracticeFocus: "信頼度の高い重点練習箇所は見つかりませんでした。",
+  practiceFocusDescription: "同じ地点で2回以上の巻き戻し、または中以上の信頼度で運転ミスが疑われる地点を機械抽出しています。",
+  noPracticeFocus: "この基準に該当する重点練習候補はありません。",
+  selectionReason: "選定理由",
+  repeatedRewindReason: "同じ地点で複数回",
+  credibleDrivingErrorReason: "中以上の信頼度で運転ミス疑い",
+  high: "高",
+  medium: "中",
   low: "低",
   sections: "セクション",
   end: "終了地点",

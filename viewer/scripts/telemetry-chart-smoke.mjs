@@ -7,6 +7,7 @@ import ts from "typescript";
 async function compileModule(sourceUrl, filename) {
   let source = await readFile(sourceUrl, "utf-8");
   source = source.replace('from "./uiText"', 'from "./uiText.mjs"');
+  source = source.replace('from "./practiceFocus"', 'from "./practiceFocus.mjs"');
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ES2022,
@@ -23,6 +24,14 @@ async function compileModule(sourceUrl, filename) {
     },
   }).outputText;
   await writeFile(join(directory, "uiText.mjs"), uiTextCompiled, "utf-8");
+  const practiceFocusSource = await readFile(new URL("../src/lib/practiceFocus.ts", import.meta.url), "utf-8");
+  const practiceFocusCompiled = ts.transpileModule(practiceFocusSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  await writeFile(join(directory, "practiceFocus.mjs"), practiceFocusCompiled, "utf-8");
   const modulePath = join(directory, filename);
   await writeFile(modulePath, compiled, "utf-8");
   return import(`file:///${modulePath.replaceAll("\\", "/")}`);

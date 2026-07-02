@@ -34,8 +34,8 @@ const {
   uiText,
 } = uiTextModule;
 
-assert.equal(UI_TEXT_CONTRACT.length, 157);
-assert.equal(new Set(UI_TEXT_CONTRACT.map((entry) => entry.id)).size, 157);
+assert.equal(UI_TEXT_CONTRACT.length, 164);
+assert.equal(new Set(UI_TEXT_CONTRACT.map((entry) => entry.id)).size, 164);
 assert.doesNotMatch(JSON.stringify(UI_TEXT_CONTRACT), /Processed output is ready for browser loading|Load a processed projected-lap CSV manually|Load CSV manually|Telemetry Overlay/);
 
 assert.deepEqual([...KEEP_ENGLISH_TEXTS], [
@@ -61,6 +61,8 @@ assert.equal(SESSION_STATUS_LABELS.partial, "部分出力");
 assert.equal(SESSION_STATUS_LABELS.loaded, "読込中");
 assert.equal(UI_TEXT.external, "外的要因");
 assert.equal(UI_TEXT.driving, "運転ミス");
+assert.equal(UI_TEXT.practiceFocusDescription, "同じ地点で2回以上の巻き戻し、または中以上の信頼度で運転ミスが疑われる地点を機械抽出しています。");
+assert.equal(UI_TEXT.noPracticeFocus, "この基準に該当する重点練習候補はありません。");
 assert.equal(TUNE_TEXT.pressure, "圧力");
 assert.equal(CHART_TEXT.description, "有効走行ラインには置換されていないサンプルを使用します。巻き戻しはイベントマーカーとして残ります。間引きは表示専用で、極値を保持します。");
 

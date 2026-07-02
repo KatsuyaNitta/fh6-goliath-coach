@@ -6,9 +6,10 @@ import { VehicleTunePanel } from "./components/VehicleTunePanel";
 import { SessionBrowserPanel } from "./components/SessionBrowserPanel";
 import { TelemetryChartsPanel } from "./components/TelemetryChartsPanel";
 import { classificationLabel, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
+import type { PracticeFocusReason } from "./lib/practiceFocus";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { INITIAL_MAP_DISPLAY_MODE, shouldAutoRotateOverview, type MapDisplayMode } from "./lib/mapDisplayMode";
-import { sectionForRewindSelection } from "./lib/rewindSelection";
+import { rewindNavigationDecision, sectionForRewindSelection } from "./lib/rewindSelection";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 import { UI_TEXT } from "./lib/uiText";
 import type { LoadedSessionVehicleMetadata } from "./lib/vehicleAutofill";
@@ -105,6 +106,16 @@ export function App() {
     }
   }
 
+  function navigateToRewindSection(sectionId: string | undefined): void {
+    const { shouldReframe, targetSectionId } = rewindNavigationDecision(selectedSectionId, mapDisplayMode, sectionId);
+    setSelectedSectionId(targetSectionId);
+    setMapDisplayMode("section-focus");
+    setOverviewRotationStopped(true);
+    if (shouldReframe) {
+      requestSectionFocusCamera(targetSectionId);
+    }
+  }
+
   function requestSectionFocusCamera(sectionId: SectionId): void {
     setSectionFocusRequest((current) => ({
       sectionId,
@@ -127,7 +138,7 @@ export function App() {
     }
     setSelectedRewindClusterId(cluster.clusterId);
     setSelectedRewindEventId("");
-    setSelectedSectionId((current) => sectionForRewindSelection(current, cluster.sectionId));
+    navigateToRewindSection(cluster.sectionId);
   }
 
   function selectRewindEvent(event: ProjectedLapPoint | undefined): void {
@@ -136,7 +147,7 @@ export function App() {
     }
     setSelectedRewindClusterId(event.rewindClusterId || event.rewindEventId);
     setSelectedRewindEventId(event.rewindEventId);
-    setSelectedSectionId((current) => sectionForRewindSelection(current, event.sectionId));
+    navigateToRewindSection(event.sectionId);
   }
 
   function clearRewindSelection(): void {
@@ -412,9 +423,30 @@ export function App() {
             ) : null}
             <div className="practice-focus">
               <b>{UI_TEXT.practiceFocus}</b>
-              {projectedLap.rewindSummary.practiceFocus.length > 0 ? projectedLap.rewindSummary.practiceFocus.map((cluster) => (
-                <button key={cluster.clusterId} type="button" onClick={() => selectRewindCluster(cluster)}>
-                  {cluster.sectionId} {(cluster.courseDistanceM / 1000).toFixed(1)} km
+              <p className="status-text">{UI_TEXT.practiceFocusDescription}</p>
+              {projectedLap.rewindSummary.practiceFocus.length > 0 ? projectedLap.rewindSummary.practiceFocus.map((candidate) => (
+                <button
+                  aria-pressed={candidate.cluster.clusterId === selectedRewindClusterId}
+                  className={candidate.cluster.clusterId === selectedRewindClusterId ? "selected" : ""}
+                  key={candidate.cluster.clusterId}
+                  type="button"
+                  onClick={() => selectRewindCluster(candidate.cluster)}
+                >
+                  <span className="practice-focus-title">
+                    {candidate.cluster.sectionId} - {(candidate.cluster.courseDistanceM / 1000).toFixed(1)} km
+                  </span>
+                  <span className="practice-focus-row">
+                    <b>{UI_TEXT.selectionReason}</b>
+                    <span>{candidate.reasons.map(formatPracticeFocusReason).join(" / ")}</span>
+                  </span>
+                  <span className="practice-focus-grid">
+                    <span>{UI_TEXT.rewinds} {candidate.cluster.eventCount}</span>
+                    <span>{UI_TEXT.driving} {candidate.cluster.drivingErrorSuspectedCount}</span>
+                    <span>{UI_TEXT.external} {candidate.cluster.externalImpactSuspectedCount}</span>
+                    <span>{UI_TEXT.unclear} {candidate.cluster.undeterminedCount}</span>
+                    <span>{UI_TEXT.confidence} {formatConfidence(candidate.cluster.confidence)}</span>
+                    <span>{UI_TEXT.rewound} {candidate.cluster.rewoundTimeS.toFixed(1)} s / {candidate.cluster.rewoundCourseDistanceM.toFixed(0)} m</span>
+                  </span>
                 </button>
               )) : <p className="status-text">{UI_TEXT.noPracticeFocus}</p>}
             </div>
@@ -482,6 +514,12 @@ function formatRelativeHeight(heightM: number): string {
 }
 
 function formatConfidence(value: string): string {
+  if (value === "high") {
+    return UI_TEXT.high;
+  }
+  if (value === "medium") {
+    return UI_TEXT.medium;
+  }
   if (value === "low") {
     return UI_TEXT.low;
   }
@@ -489,6 +527,13 @@ function formatConfidence(value: string): string {
     return UI_TEXT.unknown;
   }
   return value;
+}
+
+function formatPracticeFocusReason(reason: PracticeFocusReason): string {
+  if (reason === "repeated-rewind") {
+    return UI_TEXT.repeatedRewindReason;
+  }
+  return UI_TEXT.credibleDrivingErrorReason;
 }
 
 function formatDirection(value: string): string {

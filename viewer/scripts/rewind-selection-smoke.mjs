@@ -22,6 +22,7 @@ async function compileModule(sourceUrl, filename) {
 
 const {
   clearRewindSelectionState,
+  rewindNavigationDecision,
   sectionForRewindSelection,
   selectRewindClusterState,
   selectRewindEventState,
@@ -72,6 +73,21 @@ assert.deepEqual(
 );
 assert.equal(sectionForRewindSelection("S3", invalidEvent.sectionId), "S3", "invalid rewind section should preserve current section");
 assert.deepEqual(
+  rewindNavigationDecision("S2", "overview", "S3"),
+  { targetSectionId: "S3", shouldReframe: true },
+  "overview rewind selection should reframe to the target section",
+);
+assert.deepEqual(
+  rewindNavigationDecision("S2", "section-focus", "S3"),
+  { targetSectionId: "S3", shouldReframe: true },
+  "cross-section rewind selection should reframe",
+);
+assert.deepEqual(
+  rewindNavigationDecision("S3", "section-focus", "S3"),
+  { targetSectionId: "S3", shouldReframe: false },
+  "same-section rewind selection should preserve the current camera",
+);
+assert.deepEqual(
   selectRewindEventState({ selectedSectionId: "S3", selectedRewindClusterId: "RC003", selectedRewindEventId: "" }, invalidEvent),
   { selectedSectionId: "S3", selectedRewindClusterId: "RC999", selectedRewindEventId: "RW999" },
   "invalid event section should not crash or overwrite section",
@@ -80,7 +96,7 @@ assert.deepEqual(
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
 assert.match(appSource, /function selectRewindCluster[\s\S]*sectionForRewindSelection/, "cluster selection should synchronize section centrally");
 assert.match(appSource, /function selectRewindEvent[\s\S]*sectionForRewindSelection/, "event selection should synchronize section centrally");
-assert.match(appSource, /onClick=\{\(\) => selectRewindCluster\(cluster\)\}/, "practice-focus button should use synced cluster selection");
+assert.match(appSource, /onClick=\{\(\) => selectRewindCluster\(candidate\.cluster\)\}/, "practice-focus button should use synced cluster selection");
 assert.match(appSource, /onClick=\{\(\) => selectRewindEvent\(point\)\}/, "detail event buttons should use synced event selection");
 assert.match(appSource, /function clearRewindSelection[\s\S]*setSelectedRewindClusterId\(""\)[\s\S]*setSelectedRewindEventId\(""\)/, "clear selection should only clear rewind selection state");
 assert.match(appSource, /onClick=\{\(\) => selectSectionForFocus\(section\.id\)\}/, "manual section buttons should enter explicit section focus");

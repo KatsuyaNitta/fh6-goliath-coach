@@ -1,4 +1,5 @@
 import type { SectionId } from "./reference";
+import type { MapDisplayMode } from "./mapDisplayMode";
 
 const SECTION_IDS = new Set<string>(["S1", "S2", "S3", "S4", "S5", "S6"]);
 
@@ -6,6 +7,11 @@ export interface RewindSelectionState {
   selectedSectionId: SectionId;
   selectedRewindClusterId: string;
   selectedRewindEventId: string;
+}
+
+export interface RewindNavigationDecision {
+  shouldReframe: boolean;
+  targetSectionId: SectionId;
 }
 
 export function sectionForRewindSelection(currentSectionId: SectionId, rewindSectionId: string | undefined): SectionId {
@@ -39,6 +45,18 @@ export function selectRewindEventState(
     selectedSectionId: sectionForRewindSelection(current.selectedSectionId, event.sectionId),
     selectedRewindClusterId: event.rewindClusterId || event.rewindEventId,
     selectedRewindEventId: event.rewindEventId,
+  };
+}
+
+export function rewindNavigationDecision(
+  currentSectionId: SectionId,
+  mapDisplayMode: MapDisplayMode,
+  rewindSectionId: string | undefined,
+): RewindNavigationDecision {
+  const targetSectionId = sectionForRewindSelection(currentSectionId, rewindSectionId);
+  return {
+    targetSectionId,
+    shouldReframe: mapDisplayMode !== "section-focus" || currentSectionId !== targetSectionId,
   };
 }
 
