@@ -15,6 +15,7 @@ import { OVERVIEW_AUTO_ROTATE_SPEED, type MapDisplayMode } from "../lib/mapDispl
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
 import { getSectionFocusCameraPose } from "../lib/sectionFocusCamera";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
+import { UI_TEXT } from "../lib/uiText";
 
 const MUTED_SECTION_COLOR = "#343b44";
 const MUTED_MARKER_COLOR = "#7b8490";
@@ -345,7 +346,7 @@ function ElevationContext({
         />
       </mesh>
       <Html position={[bounds.min[0], 160, bounds.max[2]]} center>
-        <span className="elevation-context-label">Relative elevation 0 m</span>
+        <span className="elevation-context-label">{UI_TEXT.relativeElevation} 0 m</span>
       </Html>
       {guides.map((guide) => (
         <group key={guide.key}>

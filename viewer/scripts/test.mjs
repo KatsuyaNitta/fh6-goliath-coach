@@ -1,5 +1,8 @@
 await import("./smoke-test.mjs");
 await import("./vehicle-tune-smoke.mjs");
+await import("./vehicle-tune-schema-smoke.mjs");
+await import("./vehicle-autofill-smoke.mjs");
+await import("./vehicle-identity-smoke.mjs");
 await import("./render-coordinate-smoke.mjs");
 await import("./relative-elevation-smoke.mjs");
 await import("./camera-orientation-smoke.mjs");
@@ -10,3 +13,4 @@ await import("./rewind-selection-smoke.mjs");
 await import("./telemetry-lap-smoke.mjs");
 await import("./session-api-smoke.mjs");
 await import("./telemetry-chart-smoke.mjs");
+await import("./ui-text-smoke.mjs");

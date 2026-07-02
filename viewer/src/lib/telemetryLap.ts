@@ -1,4 +1,5 @@
 import type { SectionId } from "./reference";
+import { UI_TEXT } from "./uiText";
 
 export type RewindClassification = "external_impact_suspected" | "driving_error_suspected" | "undetermined" | "";
 export type RewindConfidence = "high" | "medium" | "low" | "";
@@ -302,12 +303,12 @@ function sessionIdFromFileName(fileName: string): string {
 
 export function classificationLabel(classification: RewindClassification): string {
   if (classification === "external_impact_suspected") {
-    return "External impact suspected";
+    return UI_TEXT.external;
   }
   if (classification === "driving_error_suspected") {
-    return "Driving error suspected";
+    return UI_TEXT.driving;
   }
-  return "Undetermined";
+  return UI_TEXT.unclear;
 }
 
 function parseCsv(text: string): string[][] {

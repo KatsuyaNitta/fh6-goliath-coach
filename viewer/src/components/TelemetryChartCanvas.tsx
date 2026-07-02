@@ -12,6 +12,7 @@ import {
   type TelemetryChannelConfig,
   type TelemetryChartRange,
 } from "../lib/telemetryChart";
+import { CHART_TEXT, uiText } from "../lib/uiText";
 
 interface TelemetryChartCanvasProps {
   channel: TelemetryChannelConfig;
@@ -149,9 +150,9 @@ export function TelemetryChartCanvas({
   }
 
   return (
-    <div className="telemetry-chart-track" aria-label={`${channel.label} telemetry chart`}>
+    <div className="telemetry-chart-track" aria-label={`${channel.label} ${CHART_TEXT.telemetryChartSuffix}`}>
       <div
-        aria-label={`${channel.label}. ${available ? `${visiblePoints.length} visible samples; ${decimated.points.length} drawn.` : "Unavailable."}`}
+        aria-label={`${channel.label}. ${available ? uiText.visibleDrawnSamples(visiblePoints.length, decimated.points.length) : `${CHART_TEXT.unavailable}。`}`}
         className="telemetry-chart-label"
         title={channel.description}
       >
@@ -159,12 +160,12 @@ export function TelemetryChartCanvas({
         <span>{channel.unit}</span>
         {available ? (
           <small>
-            {visiblePoints.length.toLocaleString()} visible
+            {uiText.visibleSampleCount(visiblePoints.length)}
             <br />
-            {decimated.points.length.toLocaleString()} drawn
+            {uiText.drawnSampleCount(decimated.points.length)}
           </small>
         ) : (
-          <small>Unavailable</small>
+          <small>{CHART_TEXT.unavailable}</small>
         )}
       </div>
       <div
@@ -178,7 +179,7 @@ export function TelemetryChartCanvas({
         <canvas aria-hidden="true" className="telemetry-chart-canvas" ref={staticCanvasRef} />
         <canvas aria-hidden="true" className="telemetry-chart-canvas overlay" ref={overlayCanvasRef} />
         {!available ? (
-          <div className="telemetry-chart-empty">Not available - reprocess the session.</div>
+          <div className="telemetry-chart-empty">{CHART_TEXT.notAvailable}</div>
         ) : null}
       </div>
     </div>

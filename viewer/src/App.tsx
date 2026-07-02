@@ -10,6 +10,8 @@ import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { INITIAL_MAP_DISPLAY_MODE, shouldAutoRotateOverview, type MapDisplayMode } from "./lib/mapDisplayMode";
 import { sectionForRewindSelection } from "./lib/rewindSelection";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
+import { UI_TEXT } from "./lib/uiText";
+import type { LoadedSessionVehicleMetadata } from "./lib/vehicleAutofill";
 
 type ViewMode = "3d" | "2d";
 interface SectionFocusRequest {
@@ -29,6 +31,7 @@ export function App() {
   const [cameraResetKey, setCameraResetKey] = useState(0);
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
   const [loadedSessionId, setLoadedSessionId] = useState("");
+  const [loadedVehicleMetadata, setLoadedVehicleMetadata] = useState<LoadedSessionVehicleMetadata | null>(null);
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [showReference, setShowReference] = useState(true);
   const [showActual, setShowActual] = useState(true);
@@ -48,7 +51,7 @@ export function App() {
         setSelectedSectionId(payload.sections[0]?.id ?? "S1");
       })
       .catch((caught: unknown) => {
-        setError(caught instanceof Error ? caught.message : "Failed to load reference data.");
+        setError(caught instanceof Error ? caught.message : UI_TEXT.referenceLoadFailed);
       });
   }, []);
 
@@ -159,9 +162,12 @@ export function App() {
     });
   }, [cameraResetKey, projectedLap, reference, viewMode]);
 
-  function applyProjectedLap(parsed: ProjectedLapPayload, loadedSession: string): void {
+  function applyProjectedLap(parsed: ProjectedLapPayload, loadedSession: string, vehicleMetadata?: LoadedSessionVehicleMetadata): void {
     setProjectedLap(parsed);
     setLoadedSessionId(loadedSession);
+    if (vehicleMetadata) {
+      setLoadedVehicleMetadata(vehicleMetadata);
+    }
     const firstRewindCluster = parsed.rewindClusters[0];
     setSelectedRewindClusterId(firstRewindCluster?.clusterId ?? "");
     setSelectedRewindEventId("");
@@ -182,7 +188,7 @@ export function App() {
       const parsed = parseProjectedLapCsv(text, file.name);
       applyProjectedLap(parsed, parsed.sessionId);
     } catch (caught: unknown) {
-      setTelemetryError(caught instanceof Error ? caught.message : "Failed to load projected lap.");
+      setTelemetryError(caught instanceof Error ? caught.message : UI_TEXT.failedProjectedLap);
       setProjectedLap(null);
       setLoadedSessionId("");
       setHoveredTelemetryPoint(null);
@@ -215,13 +221,13 @@ export function App() {
               onManualCameraInteraction={() => setOverviewRotationStopped(true)}
               activeTelemetryPoint={activeTelemetryPoint}
             />
-            <div className="orientation-indicator" aria-label="Map orientation">
-              <span>+X -&gt; right</span>
-              <span>+Z -&gt; map up</span>
+            <div className="orientation-indicator" aria-label={UI_TEXT.mapOrientation}>
+              <span>{UI_TEXT.xRight}</span>
+              <span>{UI_TEXT.zMapUp}</span>
             </div>
           </>
         ) : (
-          <div className="load-state">{error ?? "Loading Goliath reference path..."}</div>
+          <div className="load-state">{error ?? UI_TEXT.loadingReference}</div>
         )}        </section>
         <TelemetryChartsPanel
           activeTelemetryPoint={activeTelemetryPoint}
@@ -239,8 +245,8 @@ export function App() {
 
       <aside className="control-panel" aria-label="Goliath reference controls">
         <div className="title-block">
-          <h1>FH6 Goliath Coach</h1>
-          <p>1 m sampled driving path, not verified road geometry.</p>
+          <h1>{UI_TEXT.appName}</h1>
+          <p>{UI_TEXT.appDescription}</p>
         </div>
 
         <div className="control-row">
@@ -250,7 +256,7 @@ export function App() {
             type="button"
             onClick={() => setViewMode("3d")}
           >
-            3D
+            {UI_TEXT.view3d}
           </button>
           <button
             className={viewMode === "2d" ? "active" : ""}
@@ -258,18 +264,18 @@ export function App() {
             type="button"
             onClick={() => setViewMode("2d")}
           >
-            2D
+            {UI_TEXT.view2d}
           </button>
         </div>
 
-        <div className="segmented-group two-up" aria-label="Map display mode">
+        <div className="segmented-group two-up" aria-label={UI_TEXT.mapDisplayMode}>
           <button
             className={mapDisplayMode === "overview" ? "active" : ""}
             aria-pressed={mapDisplayMode === "overview"}
             type="button"
             onClick={activateOverviewMode}
           >
-            Overview
+            {UI_TEXT.overview}
           </button>
           <button
             className={mapDisplayMode === "section-focus" ? "active" : ""}
@@ -277,23 +283,23 @@ export function App() {
             type="button"
             onClick={activateSectionFocusMode}
           >
-            Section Focus
+            {UI_TEXT.sectionFocus}
           </button>
         </div>
 
         <button className="command-button" type="button" onClick={resetCamera}>
-          Reset camera
+          {UI_TEXT.resetCamera}
         </button>
 
         <SessionBrowserPanel
           loadedSessionId={loadedSessionId}
-          onLoadProjectedLap={(parsed, sessionId) => applyProjectedLap(parsed, sessionId)}
+          onLoadProjectedLap={(parsed, sessionId, vehicleMetadata) => applyProjectedLap(parsed, sessionId, vehicleMetadata)}
         />
 
         <section className="telemetry-panel">
           <div className="panel-heading">
-            <h2>Telemetry Overlay</h2>
-            <p>Load a processed projected-lap CSV manually.</p>
+            <h2>{UI_TEXT.telemetryOverlay}</h2>
+            <p>{UI_TEXT.manualCsvDescription}</p>
           </div>
           <input
             accept=".csv,text/csv"
@@ -307,7 +313,7 @@ export function App() {
             type="button"
             onClick={() => projectedLapInputRef.current?.click()}
           >
-            Load CSV manually
+            {UI_TEXT.loadCsvManually}
           </button>
           <div className="toggle-row">
             <label>
@@ -316,7 +322,7 @@ export function App() {
                 onChange={(event) => setShowReference(event.target.checked)}
                 type="checkbox"
               />
-              Reference
+              {UI_TEXT.reference}
             </label>
             <label>
               <input
@@ -325,7 +331,7 @@ export function App() {
                 onChange={(event) => setShowActual(event.target.checked)}
                 type="checkbox"
               />
-              Actual
+              {UI_TEXT.actual}
             </label>
           </div>
           <label className="context-toggle">
@@ -335,42 +341,42 @@ export function App() {
               onChange={(event) => setShowRewinds(event.target.checked)}
               type="checkbox"
             />
-            Rewinds
+            {UI_TEXT.rewinds}
           </label>
           {projectedLap ? (
             <dl className="compact-stats telemetry-summary">
               <div>
-                <dt>Vehicle</dt>
+                <dt>{UI_TEXT.vehicle}</dt>
                 <dd className="vehicle-name">{projectedLap.vehicle.displayName}</dd>
               </div>
               <div>
-                <dt>Session</dt>
-                <dd>{projectedLap.sessionId || "Unknown"}</dd>
+                <dt>{UI_TEXT.session}</dt>
+                <dd>{projectedLap.sessionId || UI_TEXT.unknown}</dd>
               </div>
               <div>
-                <dt>File</dt>
+                <dt>{UI_TEXT.file}</dt>
                 <dd className="file-name">{projectedLap.fileName}</dd>
               </div>
               <div>
-                <dt>Lap time</dt>
+                <dt>{UI_TEXT.lapTime}</dt>
                 <dd>{formatSeconds(projectedLap.totalLapTimeS)}</dd>
               </div>
               <div>
-                <dt>Rewinds</dt>
+                <dt>{UI_TEXT.rewinds}</dt>
                 <dd>{projectedLap.rewindSummary.rewindCount}</dd>
               </div>
               <div>
-                <dt>Markers</dt>
+                <dt>{UI_TEXT.markers}</dt>
                 <dd>{projectedLap.markers.length}</dd>
               </div>
             </dl>
           ) : (
-            <p className="status-text">{telemetryError ?? "No projected lap loaded."}</p>
+            <p className="status-text">{telemetryError ?? UI_TEXT.noProjectedLap}</p>
           )}
           {telemetryError && projectedLap ? <p className="status-text">{telemetryError}</p> : null}
         </section>
 
-        <div className="segmented-group" aria-label="Elevation scale">
+        <div className="segmented-group" aria-label={UI_TEXT.elevationScale}>
           {[1, 2, 3, 5].map((scale) => (
             <button
               className={elevationScale === scale ? "active" : ""}
@@ -389,43 +395,43 @@ export function App() {
             onChange={(event) => setShowElevationContext(event.target.checked)}
             type="checkbox"
           />
-          Elevation context
+          {UI_TEXT.elevationContext}
         </label>
 
         {relativeElevation ? (
           <section className="section-detail compact-panel">
-            <h2>Relative Elevation</h2>
+            <h2>{UI_TEXT.relativeElevation}</h2>
             <dl>
               <div>
-                <dt>Datum</dt>
-                <dd>Course minimum = 0 m</dd>
+                <dt>{UI_TEXT.datum}</dt>
+                <dd>{UI_TEXT.courseMinimum}</dd>
               </div>
               <div>
-                <dt>Start</dt>
+                <dt>{UI_TEXT.start}</dt>
                 <dd>{formatRelativeHeight(relativeElevation.start_relative_height_m)}</dd>
               </div>
               <div>
-                <dt>Finish</dt>
+                <dt>{UI_TEXT.finish}</dt>
                 <dd>{formatRelativeHeight(relativeElevation.finish_relative_height_m)}</dd>
               </div>
               <div>
-                <dt>Maximum</dt>
+                <dt>{UI_TEXT.maximum}</dt>
                 <dd>{formatRelativeHeight(relativeElevation.range_m)}</dd>
               </div>
               <div>
-                <dt>Range</dt>
+                <dt>{UI_TEXT.range}</dt>
                 <dd>{relativeElevation.range_m.toFixed(1)} m</dd>
               </div>
               <div>
-                <dt>Minimum at</dt>
+                <dt>{UI_TEXT.minimumAt}</dt>
                 <dd>{(relativeElevation.minimum_course_distance_m / 1000).toFixed(3)} km</dd>
               </div>
               <div>
-                <dt>Maximum at</dt>
+                <dt>{UI_TEXT.maximumAt}</dt>
                 <dd>{(relativeElevation.maximum_course_distance_m / 1000).toFixed(3)} km</dd>
               </div>
               <div>
-                <dt>Visual</dt>
+                <dt>{UI_TEXT.visual}</dt>
                 <dd>{elevationScale}x</dd>
               </div>
             </dl>
@@ -435,26 +441,26 @@ export function App() {
 
         {projectedLap && projectedLap.rewindSummary.rewindCount > 0 ? (
           <section className="section-detail compact-panel">
-            <h2>Rewinds</h2>
+            <h2>{UI_TEXT.rewinds}</h2>
             <dl>
               <div>
-                <dt>Rewinds</dt>
+                <dt>{UI_TEXT.rewinds}</dt>
                 <dd>{projectedLap.rewindSummary.rewindCount}</dd>
               </div>
               <div>
-                <dt>External</dt>
+                <dt>{UI_TEXT.external}</dt>
                 <dd>{projectedLap.rewindSummary.externalImpactSuspectedCount}</dd>
               </div>
               <div>
-                <dt>Driving</dt>
+                <dt>{UI_TEXT.driving}</dt>
                 <dd>{projectedLap.rewindSummary.drivingErrorSuspectedCount}</dd>
               </div>
               <div>
-                <dt>Unclear</dt>
+                <dt>{UI_TEXT.unclear}</dt>
                 <dd>{projectedLap.rewindSummary.undeterminedCount}</dd>
               </div>
             </dl>
-            <p className="status-text">External impact suspected is a cautious inference from abrupt impulses or speed changes. It does not identify AI cars, walls, or terrain.</p>
+            <p className="status-text">{UI_TEXT.rewindCaution}</p>
             <div className="rewind-section-breakdown">
               {Object.entries(projectedLap.rewindSummary.bySection).map(([sectionId, count]) => (
                 <span key={sectionId}>{sectionId}: {count}</span>
@@ -464,14 +470,14 @@ export function App() {
               <div className="rewind-detail">
                 <h3>{selectedRewindCluster.clusterId} {selectedRewindCluster.sectionId}</h3>
                 <dl>
-                  <div><dt>Distance</dt><dd>{(selectedRewindDetailPoint.courseDistanceM / 1000).toFixed(3)} km</dd></div>
-                  <div><dt>Events</dt><dd>{selectedRewindCluster.eventCount}</dd></div>
-                  <div><dt>Class</dt><dd>{classificationLabel(selectedRewindDetailPoint.rewindClassification)}</dd></div>
-                  <div><dt>Confidence</dt><dd>{selectedRewindDetailPoint.rewindConfidence || selectedRewindCluster.confidence || "low"}</dd></div>
-                  <div><dt>Rewound</dt><dd>{(selectedRewindDetailPoint.rewoundTimeS ?? selectedRewindCluster.rewoundTimeS).toFixed(1)} s / {(selectedRewindDetailPoint.rewoundCourseDistanceM ?? selectedRewindCluster.rewoundCourseDistanceM).toFixed(0)} m</dd></div>
-                  <div><dt>Direction</dt><dd>{selectedRewindDetailPoint.rewindImpactDirection || selectedRewindCluster.impactDirection || "unknown"}</dd></div>
+                  <div><dt>{UI_TEXT.distance}</dt><dd>{(selectedRewindDetailPoint.courseDistanceM / 1000).toFixed(3)} km</dd></div>
+                  <div><dt>{UI_TEXT.events}</dt><dd>{selectedRewindCluster.eventCount}</dd></div>
+                  <div><dt>{UI_TEXT.class}</dt><dd>{classificationLabel(selectedRewindDetailPoint.rewindClassification)}</dd></div>
+                  <div><dt>{UI_TEXT.confidence}</dt><dd>{formatConfidence(selectedRewindDetailPoint.rewindConfidence || selectedRewindCluster.confidence || "low")}</dd></div>
+                  <div><dt>{UI_TEXT.rewound}</dt><dd>{(selectedRewindDetailPoint.rewoundTimeS ?? selectedRewindCluster.rewoundTimeS).toFixed(1)} s / {(selectedRewindDetailPoint.rewoundCourseDistanceM ?? selectedRewindCluster.rewoundCourseDistanceM).toFixed(0)} m</dd></div>
+                  <div><dt>{UI_TEXT.direction}</dt><dd>{formatDirection(selectedRewindDetailPoint.rewindImpactDirection || selectedRewindCluster.impactDirection || "unknown")}</dd></div>
                 </dl>
-                <div className="rewind-event-list" aria-label="Rewind events">
+                <div className="rewind-event-list" aria-label={UI_TEXT.rewindEvents}>
                   {selectedRewindCluster.points.map((point) => (
                     <button
                       className={point.rewindEventId === selectedRewindEventId ? "selected" : ""}
@@ -483,20 +489,20 @@ export function App() {
                     </button>
                   ))}
                 </div>
-                <button className="text-button" type="button" onClick={clearRewindSelection}>Clear rewind selection</button>
+                <button className="text-button" type="button" onClick={clearRewindSelection}>{UI_TEXT.clearRewindSelection}</button>
               </div>
             ) : null}
             <div className="practice-focus">
-              <b>Practice focus</b>
+              <b>{UI_TEXT.practiceFocus}</b>
               {projectedLap.rewindSummary.practiceFocus.length > 0 ? projectedLap.rewindSummary.practiceFocus.map((cluster) => (
                 <button key={cluster.clusterId} type="button" onClick={() => selectRewindCluster(cluster)}>
                   {cluster.sectionId} {(cluster.courseDistanceM / 1000).toFixed(1)} km
                 </button>
-              )) : <p className="status-text">No high-confidence practice focus identified.</p>}
+              )) : <p className="status-text">{UI_TEXT.noPracticeFocus}</p>}
             </div>
           </section>
         ) : null}
-        <div className="section-list" aria-label="Sections">
+        <div className="section-list" aria-label={UI_TEXT.sections}>
           {reference?.sections.map((section) => (
             <button
               className={section.id === selectedSectionId ? "section-button selected" : "section-button"}
@@ -517,20 +523,20 @@ export function App() {
             <p>{selectedSection.name_en}</p>
             <dl>
               <div>
-                <dt>Start</dt>
+                <dt>{UI_TEXT.start}</dt>
                 <dd>{(selectedSection.start_distance_m / 1000).toFixed(3)} km</dd>
               </div>
               <div>
-                <dt>End</dt>
+                <dt>{UI_TEXT.end}</dt>
                 <dd>{(selectedSection.end_distance_m / 1000).toFixed(3)} km</dd>
               </div>
               <div>
-                <dt>Length</dt>
+                <dt>{UI_TEXT.length}</dt>
                 <dd>{(selectedSection.length_m / 1000).toFixed(3)} km</dd>
               </div>
               {selectedTelemetrySection && selectedTelemetrySection.sampleCount > 0 ? (
                 <div>
-                  <dt>Actual time</dt>
+                  <dt>{UI_TEXT.actualTime}</dt>
                   <dd>{formatSeconds(selectedTelemetrySection.elapsedTimeS)}</dd>
                 </div>
               ) : null}
@@ -538,7 +544,7 @@ export function App() {
           </section>
         ) : null}
 
-        <VehicleTunePanel />
+        <VehicleTunePanel loadedVehicleMetadata={loadedVehicleMetadata} />
       </aside>
     </main>
   );
@@ -555,4 +561,21 @@ function formatRelativeHeight(heightM: number): string {
     return "0.0 m";
   }
   return `${heightM > 0 ? "+" : ""}${heightM.toFixed(1)} m`;
+}
+
+function formatConfidence(value: string): string {
+  if (value === "low") {
+    return UI_TEXT.low;
+  }
+  if (!value) {
+    return UI_TEXT.unknown;
+  }
+  return value;
+}
+
+function formatDirection(value: string): string {
+  if (value === "unknown" || !value) {
+    return UI_TEXT.unknown;
+  }
+  return value;
 }

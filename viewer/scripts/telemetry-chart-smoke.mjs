@@ -5,7 +5,8 @@ import { join } from "node:path";
 import ts from "typescript";
 
 async function compileModule(sourceUrl, filename) {
-  const source = await readFile(sourceUrl, "utf-8");
+  let source = await readFile(sourceUrl, "utf-8");
+  source = source.replace('from "./uiText"', 'from "./uiText.mjs"');
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ES2022,
@@ -14,6 +15,14 @@ async function compileModule(sourceUrl, filename) {
   }).outputText;
   const directory = join(tmpdir(), `fh6-telemetry-chart-${Date.now()}-${Math.random()}`);
   await mkdir(directory, { recursive: true });
+  const uiTextSource = await readFile(new URL("../src/lib/uiText.ts", import.meta.url), "utf-8");
+  const uiTextCompiled = ts.transpileModule(uiTextSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  await writeFile(join(directory, "uiText.mjs"), uiTextCompiled, "utf-8");
   const modulePath = join(directory, filename);
   await writeFile(modulePath, compiled, "utf-8");
   return import(`file:///${modulePath.replaceAll("\\", "/")}`);
@@ -117,11 +126,11 @@ const canvasSource = await readFile(new URL("../src/components/TelemetryChartCan
 const stylesSource = await readFile(new URL("../src/styles.css", import.meta.url), "utf-8");
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
 const tasksSource = await readFile(new URL("../../TASKS.md", import.meta.url), "utf-8");
-assert.match(panelSource, /Telemetry Charts/);
-assert.match(panelSource, /Full lap/);
-assert.match(panelSource, /Selected section/);
-assert.match(panelSource, /Clear cursor/);
-assert.match(appSource, /Load CSV manually/);
+assert.match(panelSource, /CHART_TEXT\.title/);
+assert.match(panelSource, /CHART_TEXT\.fullLap/);
+assert.match(panelSource, /CHART_TEXT\.selectedSection/);
+assert.match(panelSource, /CHART_TEXT\.clearCursor/);
+assert.match(appSource, /UI_TEXT\.loadCsvManually/);
 assert.match(panelSource, /ProjectedLapPayload/);
 assert.match(panelSource, /TELEMETRY_TRACK_LAYOUTS/);
 assert.match(panelSource, /height=\{layout\.height\}/);
@@ -129,10 +138,10 @@ assert.match(panelSource, /showDistanceLabels=\{layout\.showDistanceLabels\}/);
 assert.match(panelSource, /showSectionLabels=\{layout\.showSectionLabels\}/);
 assert.match(panelSource, /showMarkerLabels=\{layout\.showMarkerLabels\}/);
 assert.match(panelSource, /showRewindLabels=\{layout\.showRewindLabels\}/);
-assert.match(canvasSource, /visible.*drawn/s);
+assert.match(canvasSource, /visibleDrawnSamples/s);
 assert.doesNotMatch(canvasSource, /className="telemetry-chart-description"/);
-assert.match(canvasSource, /<small>Unavailable<\/small>/);
-assert.match(canvasSource, /Not available - reprocess the session\./);
+assert.match(canvasSource, /<small>\{CHART_TEXT\.unavailable\}<\/small>/);
+assert.match(canvasSource, /CHART_TEXT\.notAvailable/);
 assert.match(canvasSource, /onHoverPoint\(point\)/);
 assert.match(canvasSource, /onPinPoint\(point\)/);
 assert.match(stylesSource, /\.telemetry-chart-stack\s*\{[^}]*gap:\s*6px/s);

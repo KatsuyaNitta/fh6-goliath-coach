@@ -8,16 +8,18 @@ import {
   type SessionRecord,
 } from "../lib/sessionApi";
 import { parseProjectedLapCsv, type ProjectedLapPayload } from "../lib/telemetryLap";
+import { SESSION_STATUS_LABELS, SESSION_TEXT, uiText } from "../lib/uiText";
+import type { LoadedSessionVehicleMetadata } from "../lib/vehicleAutofill";
 
 interface SessionBrowserPanelProps {
   loadedSessionId: string;
-  onLoadProjectedLap: (payload: ProjectedLapPayload, sessionId: string) => void;
+  onLoadProjectedLap: (payload: ProjectedLapPayload, sessionId: string, vehicleMetadata?: LoadedSessionVehicleMetadata) => void;
 }
 
 type ActionKind = "load" | "process" | "disabled";
-const TRASH_ACTION_LABEL = "ごみ箱へ移動";
-const TRASH_CANCEL_LABEL = "キャンセル";
-const UNKNOWN_STARTED_LABEL = "開始時刻不明";
+const TRASH_ACTION_LABEL = SESSION_TEXT.trashAction;
+const TRASH_CANCEL_LABEL = SESSION_TEXT.trashCancel;
+const UNKNOWN_STARTED_LABEL = SESSION_TEXT.unknownStart;
 
 export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: SessionBrowserPanelProps) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -62,42 +64,48 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
     try {
       const payload = await fetchSessions({ includeIgnored: showIgnored });
       setSessions(payload.sessions);
-      setStatusText(`Found ${payload.sessions.length} local session${payload.sessions.length === 1 ? "" : "s"}.`);
+      setStatusText(uiText.foundLocalSessions(payload.sessions.length));
     } catch (error) {
-      setErrorText(apiMessage(error, "Local session service unavailable."));
+      setErrorText(apiMessage(error, SESSION_TEXT.serviceUnavailable));
       setStatusText("");
     } finally {
       setLoadingList(false);
     }
   }
 
-  async function loadProcessedSession(sessionId: string): Promise<void> {
+  async function loadProcessedSession(session: SessionRecord): Promise<void> {
+    const sessionId = session.session_id;
     setActionSessionId(sessionId);
     setErrorText("");
-    setStatusText("Loading projected lap...");
+    setStatusText(SESSION_TEXT.loadingProjectedLap);
     try {
       const csv = await fetchProjectedLapCsv(sessionId);
       const parsed = parseProjectedLapCsv(csv.text, csv.fileName);
-      onLoadProjectedLap(parsed, sessionId);
-      setStatusText(`Loaded ${sessionId}.`);
+      onLoadProjectedLap(parsed, sessionId, {
+        displayName: session.vehicle.display_name,
+        carOrdinal: session.vehicle.car_ordinal,
+        loadId: Date.now(),
+      });
+      setStatusText(uiText.loadedSession(sessionId));
     } catch (error) {
-      setErrorText(apiMessage(error, "Failed to load processed projected lap."));
+      setErrorText(apiMessage(error, SESSION_TEXT.failedLoadProjectedLap));
       setStatusText("");
     } finally {
       setActionSessionId("");
     }
   }
 
-  async function processAndLoad(sessionId: string): Promise<void> {
+  async function processAndLoad(session: SessionRecord): Promise<void> {
+    const sessionId = session.session_id;
     setActionSessionId(sessionId);
     setErrorText("");
-    setStatusText("Processing...");
+    setStatusText(SESSION_TEXT.processing);
     try {
       await processSession(sessionId);
       await refreshSessions();
-      await loadProcessedSession(sessionId);
+      await loadProcessedSession(session);
     } catch (error) {
-      setErrorText(apiMessage(error, "Failed to process selected session."));
+      setErrorText(apiMessage(error, SESSION_TEXT.failedProcess));
       setStatusText("");
       setActionSessionId("");
     }
@@ -106,15 +114,15 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
   async function confirmTrashSession(session: SessionRecord): Promise<void> {
     setActionSessionId(session.session_id);
     setErrorText("");
-    setStatusText("Moving session to the Windows Recycle Bin...");
+    setStatusText(SESSION_TEXT.trashProgress);
     try {
       await trashSession(session.session_id);
       setTrashDialogSessionId("");
       setSelectedSessionId("");
       await refreshSessions();
-      setStatusText(`セッション ${session.session_id} をWindowsのごみ箱へ移動しました。`);
+      setStatusText(SESSION_TEXT.trashMoved(session.session_id));
     } catch (error) {
-      setErrorText(apiMessage(error, "Failed to move session to the Windows Recycle Bin."));
+      setErrorText(apiMessage(error, SESSION_TEXT.trashFailed));
       setStatusText("");
     } finally {
       setActionSessionId("");
@@ -130,25 +138,25 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
   return (
     <section className="session-browser-panel">
       <div className="panel-heading">
-        <h2>Local Sessions</h2>
-        <p>Selecting a session does not replace the loaded telemetry.</p>
+        <h2>{SESSION_TEXT.title}</h2>
+        <p>{SESSION_TEXT.description}</p>
       </div>
       <div className="session-browser-actions">
         <button className="command-button" disabled={loadingList || busy} type="button" onClick={() => void refreshSessions()}>
-          {loadingList ? "Refreshing..." : "Refresh"}
+          {loadingList ? SESSION_TEXT.refreshing : SESSION_TEXT.refresh}
         </button>
         <label className="context-toggle compact-toggle">
           <input checked={showIgnored} onChange={(event) => setShowIgnored(event.target.checked)} type="checkbox" />
-          Show ignored
+          {SESSION_TEXT.showIgnored}
         </label>
         <button className="command-button" disabled={!statusText && !errorText} type="button" onClick={() => { setStatusText(""); setErrorText(""); }}>
-          Clear
+          {SESSION_TEXT.clear}
         </button>
       </div>
       {errorText ? <p className="status-text error-text">{errorText}</p> : null}
       {statusText ? <p className="status-text">{statusText}</p> : null}
-      <div className="session-card-list" aria-label="Local telemetry sessions">
-        {sessions.length === 0 && !loadingList ? <p className="status-text">No local sessions found.</p> : null}
+      <div className="session-card-list" aria-label={SESSION_TEXT.listLabel}>
+        {sessions.length === 0 && !loadingList ? <p className="status-text">{SESSION_TEXT.noSessions}</p> : null}
         {sessions.map((session) => (
           <button
             className={sessionCardClass(session, selectedSessionId, loadedSessionId)}
@@ -156,10 +164,10 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
             type="button"
             onClick={() => setSelectedSessionId(session.session_id)}
           >
-            <span className="session-card-title">{session.vehicle.display_name || "Unknown vehicle"}</span>
+            <span className="session-card-title">{session.vehicle.display_name || SESSION_TEXT.unknownVehicle}</span>
             <span className="session-card-id">{session.session_id}</span>
             <span className="session-card-meta">{formatStarted(session.started_at)} - PI {session.vehicle.car_performance_index ?? "?"}</span>
-            <span className="session-card-meta">{formatDuration(session.duration_s)} - {session.saved_packets ?? 0} packets</span>
+            <span className="session-card-meta">{formatDuration(session.duration_s)} - {session.saved_packets ?? 0} {SESSION_TEXT.packets}</span>
             <span className="session-badge-row">
               <StatusBadge label={session.source_status} />
               <StatusBadge label={session.process_status} />
@@ -173,13 +181,13 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
           <b>{selectedSession.session_id}</b>
           <p className="status-text">{actionHelp(selectedSession)}</p>
           {action === "process" ? (
-            <button className="command-button" disabled={busy} type="button" onClick={() => void processAndLoad(selectedSession.session_id)}>
-              {actionSessionId === selectedSession.session_id ? "Processing..." : "Process & Load"}
+            <button className="command-button" disabled={busy} type="button" onClick={() => void processAndLoad(selectedSession)}>
+              {actionSessionId === selectedSession.session_id ? SESSION_TEXT.processing : SESSION_TEXT.processAndLoad}
             </button>
           ) : null}
           {action === "load" ? (
-            <button className="command-button" disabled={busy} type="button" onClick={() => void loadProcessedSession(selectedSession.session_id)}>
-              {actionSessionId === selectedSession.session_id ? "Loading..." : "Load"}
+            <button className="command-button" disabled={busy} type="button" onClick={() => void loadProcessedSession(selectedSession)}>
+              {actionSessionId === selectedSession.session_id ? SESSION_TEXT.loading : SESSION_TEXT.load}
             </button>
           ) : null}
           {trashHelp ? <p className="status-text">{trashHelp}</p> : null}
@@ -208,29 +216,29 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
       >
         {dialogSession ? (
           <form method="dialog" onSubmit={(event) => event.preventDefault()}>
-            <h2 id="trash-session-dialog-title">Windows Recycle Bin</h2>
+            <h2 id="trash-session-dialog-title">{SESSION_TEXT.trashTitle}</h2>
             <dl className="dialog-details">
               <div>
-                <dt>Vehicle</dt>
-                <dd>{dialogSession.vehicle.display_name || "Unknown vehicle"}</dd>
+                <dt>車両</dt>
+                <dd>{dialogSession.vehicle.display_name || SESSION_TEXT.unknownVehicle}</dd>
               </div>
               <div>
-                <dt>Session</dt>
+                <dt>セッション</dt>
                 <dd>{dialogSession.session_id}</dd>
               </div>
               <div>
-                <dt>Started</dt>
+                <dt>{SESSION_TEXT.started}</dt>
                 <dd>{formatStarted(dialogSession.started_at, UNKNOWN_STARTED_LABEL)}</dd>
               </div>
             </dl>
-            <p>このセッションをWindowsのごみ箱へ移動しますか？</p>
-            <p className="status-text">処理済みデータは対象外です。ごみ箱から復元できます。</p>
+            <p>{SESSION_TEXT.trashConfirm}</p>
+            <p className="status-text">{SESSION_TEXT.trashHelp}</p>
             <div className="dialog-actions">
               <button ref={cancelButtonRef} className="command-button" disabled={busy} type="button" onClick={() => setTrashDialogSessionId("")}>
                 {TRASH_CANCEL_LABEL}
               </button>
               <button className="command-button danger-button" disabled={busy} type="button" onClick={() => void confirmTrashSession(dialogSession)}>
-                {actionSessionId === dialogSession.session_id ? "Moving..." : TRASH_ACTION_LABEL}
+                {actionSessionId === dialogSession.session_id ? SESSION_TEXT.trashMoving : TRASH_ACTION_LABEL}
               </button>
             </div>
           </form>
@@ -252,24 +260,24 @@ function actionForSession(session: SessionRecord): ActionKind {
 
 function actionHelp(session: SessionRecord): string {
   if (session.process_status === "processed") {
-    return "Processed output is ready for browser loading.";
+    return SESSION_TEXT.actionReady;
   }
   if (session.process_status === "unprocessed" && ["completed", "legacy-ready"].includes(session.source_status)) {
-    return "This completed local session can be processed and loaded.";
+    return SESSION_TEXT.actionProcess;
   }
   if (session.process_status === "partial") {
-    return "Partial processed output needs CLI inspection before loading.";
+    return SESSION_TEXT.actionPartial;
   }
   if (session.process_status === "ignored") {
-    return session.ignored_reason || "Ignored sessions are not processed from the browser.";
+    return session.ignored_reason || SESSION_TEXT.actionIgnored;
   }
   if (session.source_status === "incomplete") {
-    return "Incomplete recordings cannot be processed yet.";
+    return SESSION_TEXT.actionIncomplete;
   }
   if (session.source_status === "invalid") {
-    return session.errors[0] || "Invalid session source files.";
+    return session.errors[0] || SESSION_TEXT.actionInvalid;
   }
-  return "No browser action is available for this session.";
+  return SESSION_TEXT.actionUnavailable;
 }
 
 function canTrashSession(session: SessionRecord, loadedSessionId: string, busy: boolean): boolean {
@@ -278,19 +286,19 @@ function canTrashSession(session: SessionRecord, loadedSessionId: string, busy: 
 
 function trashAvailabilityText(session: SessionRecord, loadedSessionId: string, busy: boolean): string {
   if (busy) {
-    return "Another session action is running.";
+    return SESSION_TEXT.busy;
   }
   if (session.session_id === loadedSessionId) {
-    return "Loaded sessions cannot be moved to the Windows Recycle Bin.";
+    return SESSION_TEXT.loadedCannotTrash;
   }
   if (session.process_status === "processed") {
-    return "Processed sessions are protected from this action.";
+    return SESSION_TEXT.processedProtected;
   }
   if (session.process_status === "partial") {
-    return "Partial processed output needs CLI inspection before this action.";
+    return SESSION_TEXT.partialTrashBlocked;
   }
   if (["unprocessed", "ignored"].includes(session.process_status)) {
-    return "Eligible source sessions can be moved to the Windows Recycle Bin.";
+    return SESSION_TEXT.trashEligible;
   }
   return "";
 }
@@ -307,10 +315,10 @@ function sessionCardClass(session: SessionRecord, selectedSessionId: string, loa
 }
 
 function StatusBadge({ label }: { label: string }) {
-  return <span className={`status-badge status-${label.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}`}>{label}</span>;
+  return <span className={`status-badge status-${label.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}`}>{SESSION_STATUS_LABELS[label] ?? label}</span>;
 }
 
-function formatStarted(value: string | null, fallback = "Unknown start"): string {
+function formatStarted(value: string | null, fallback = SESSION_TEXT.unknownStart): string {
   if (!value) {
     return fallback;
   }
@@ -323,7 +331,7 @@ function formatStarted(value: string | null, fallback = "Unknown start"): string
 
 function formatDuration(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) {
-    return "Unknown duration";
+    return SESSION_TEXT.unknownDuration;
   }
   const minutes = Math.floor(seconds / 60);
   const remainder = Math.round(seconds - minutes * 60).toString().padStart(2, "0");
@@ -332,10 +340,10 @@ function formatDuration(seconds: number | null): string {
 
 function apiMessage(error: unknown, fallback: string): string {
   if (error instanceof SessionApiError) {
-    return error.message || fallback;
+    return error.message ? `${fallback} Technical details: ${error.message}` : fallback;
   }
   if (error instanceof Error) {
-    return error.message;
+    return `${fallback} Technical details: ${error.message}`;
   }
   return fallback;
 }

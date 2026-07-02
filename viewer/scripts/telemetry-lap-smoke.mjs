@@ -5,7 +5,8 @@ import { join } from "node:path";
 import ts from "typescript";
 
 async function compileModule(sourceUrl, filename) {
-  const source = await readFile(sourceUrl, "utf-8");
+  let source = await readFile(sourceUrl, "utf-8");
+  source = source.replace('from "./uiText"', 'from "./uiText.mjs"');
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ES2022,
@@ -15,6 +16,14 @@ async function compileModule(sourceUrl, filename) {
 
   const directory = join(tmpdir(), `fh6-telemetry-lap-${Date.now()}-${Math.random()}`);
   await mkdir(directory, { recursive: true });
+  const uiTextSource = await readFile(new URL("../src/lib/uiText.ts", import.meta.url), "utf-8");
+  const uiTextCompiled = ts.transpileModule(uiTextSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  await writeFile(join(directory, "uiText.mjs"), uiTextCompiled, "utf-8");
   const modulePath = join(directory, filename);
   await writeFile(modulePath, compiled, "utf-8");
   return import(`file:///${modulePath.replaceAll("\\", "/")}`);
@@ -63,9 +72,9 @@ assert.equal(payload.rewindClusters[0].eventCount, 1);
 assert.equal(payload.rewindSummary.rewindCount, 1);
 assert.equal(payload.rewindSummary.drivingErrorSuspectedCount, 1);
 assert.equal(payload.sectionSummaries[0].sampleCount, 2);
-assert.equal(classificationLabel("external_impact_suspected"), "External impact suspected");
-assert.equal(classificationLabel("driving_error_suspected"), "Driving error suspected");
-assert.equal(classificationLabel("undetermined"), "Undetermined");
+assert.equal(classificationLabel("external_impact_suspected"), "外的要因");
+assert.equal(classificationLabel("driving_error_suspected"), "運転ミス");
+assert.equal(classificationLabel("undetermined"), "不明");
 
 
 
@@ -91,7 +100,7 @@ assert.equal(ordinalOnlyPayload.vehicle.filenameSlug, "car-3606");
 assert.equal(ordinalOnlyPayload.vehicle.identificationSource, "ordinal_fallback");
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
 assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/, "elevation scale should default to 5x");
-assert.match(appSource, /<dt>Vehicle<\/dt>/, "Telemetry Overlay should show a vehicle row");
+assert.match(appSource, /<dt>\{UI_TEXT\.vehicle\}<\/dt>/, "Telemetry Overlay should show a vehicle row");
 assert.match(appSource, /projectedLap\.vehicle\.displayName/, "Telemetry Overlay should display vehicle metadata from the CSV");
 assert.match(appSource, /className="vehicle-name"/, "vehicle names should have wrapping-friendly styling hook");
 assert.match(appSource, /const \[showRewinds, setShowRewinds\] = useState\(true\)/, "rewind toggle state should start enabled");

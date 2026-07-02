@@ -51,6 +51,8 @@
 - [x] Reference and actual telemetry paths use consistent selection emphasis.
 - [x] Overview map mode frames the full course, renders S1-S6 with equal emphasis, uses slow 3D automatic rotation, and stops rotation on manual camera interaction.
 - [x] Section Focus uses deterministic section-specific 3D camera framing and mode-aware Reset camera.
+- [x] Japanese UI Phase 1 is implemented with centralized UI text, Japanese-first labels, intentional English telemetry labels, and display-only unit labels `PS`, `NM`, `KG`, `KGF/MM`, and `cm`.
+- [x] Tune editor hides artificial `game`/`deg` suffixes for unitless FH6 game values, starts drivetrain/differential as explicit `null` in v2 JSON, can initialize blank vehicle name/year from a successfully loaded Local Session, and resets or warns when the loaded vehicle identity changes.
 
 ## Milestone B1
 
@@ -101,6 +103,8 @@
 - Section-boundary timing should later use interpolation.
 - `.gitignore` contains a leading UTF-8 BOM.
 - Previously tracked `backend/fh6_goliath_coach.egg-info/` files must be removed from Git tracking.
+- Full language switching and a complete i18n framework are not implemented; Japanese UI Phase 1 is a static Japanese-first pass.
+- Loaded-session vehicle autofill currently covers only vehicle name and year; PI, class, drivetrain, power, torque, weight, and setup/lap association remain future work. Drivetrain telemetry interpretation is unverified, so drivetrain remains manual. Vehicle identity comparison uses `car_ordinal` first and normalized display name as fallback; indeterminate identity preserves the current form.
 
 ---
 # 1. Repository Setup — P0
@@ -148,7 +152,7 @@
 - [x] Validate no section gaps.
 - [x] Validate no section overlap.
 - [x] Export browser-friendly JSON.
-- [x] Add schema version.
+- [x] Add schema version; user-managed vehicle/tune JSON now saves as `goliath-vehicle-tune-v2`, with v1 FWD/RWD/AWD files still readable.
 - [x] Add provenance metadata.
 
 ## Confirmed boundaries
@@ -492,7 +496,8 @@ For each corner or analysis zone:
 
 - [ ] Compare Porsche 911 GT3 and Lamborghini Essenza SCV12.
 - [x] Store car identity.
-- [x] Store drivetrain.
+- [x] Store drivetrain as FWD/RWD/AWD or explicit `null` when unset.
+- [x] Preserve tune input across same-vehicle session loads and require confirmation before replacing protected user/JSON-owned tune data for a different vehicle.
 - [x] Store PI.
 - [x] Store power.
 - [x] Store weight.
@@ -545,7 +550,7 @@ For each corner or analysis zone:
 - [ ] CSV export.
 - [ ] JSON export.
 - [ ] HTML report export.
-- [ ] Japanese UI.
+- [x] Japanese UI.
 - [ ] Dark mode.
 - [ ] Light mode.
 

@@ -80,9 +80,9 @@ const lifecycleSource = await readFile(new URL("../src/lib/cameraLifecycle.ts", 
 const reducedMotionSource = await readFile(new URL("../src/lib/useReducedMotion.ts", import.meta.url), "utf-8");
 
 assert.match(appSource, /useState<MapDisplayMode>\(INITIAL_MAP_DISPLAY_MODE\)/);
-assert.match(appSource, /aria-label="Map display mode"/);
-assert.match(appSource, />\s*Overview\s*<\/button>/);
-assert.match(appSource, />\s*Section Focus\s*<\/button>/);
+assert.match(appSource, /aria-label=\{UI_TEXT\.mapDisplayMode\}/);
+assert.match(appSource, /\{UI_TEXT\.overview\}/);
+assert.match(appSource, /\{UI_TEXT\.sectionFocus\}/);
 assert.match(appSource, /aria-pressed=\{mapDisplayMode === "overview"\}/);
 assert.match(appSource, /aria-pressed=\{mapDisplayMode === "section-focus"\}/);
 assert.match(appSource, /function activateOverviewMode\(\)/);
@@ -151,7 +151,7 @@ assert.match(chartsSource, /function pinPoint\(point: ProjectedLapPoint \| null\
 assert.match(chartsSource, /onPinTelemetryPoint\(point\);\s*if \(point\) \{\s*onSelectSection\(point\.sectionId\);/s);
 assert.match(chartsSource, /onHoverPoint=\{onHoverTelemetryPoint\}/);
 assert.doesNotMatch(chartsSource, /onPointerMove[\s\S]*onSelectSection/);
-assert.match(chartsSource, /onClick=\{\(\) => onPinTelemetryPoint\(null\)\}>Clear cursor/);
+assert.match(chartsSource, /onClick=\{\(\) => onPinTelemetryPoint\(null\)\}>\{CHART_TEXT\.clearCursor\}/);
 assert.doesNotMatch(chartsSource, /Clear cursor[\s\S]{0,200}onSelectSection/);
 
 console.log("map display mode smoke test passed");

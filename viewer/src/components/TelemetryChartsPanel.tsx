@@ -10,6 +10,7 @@ import {
   TELEMETRY_TRACK_LAYOUTS,
   type TelemetryRangeMode,
 } from "../lib/telemetryChart";
+import { CHART_TEXT } from "../lib/uiText";
 import { TelemetryChartCanvas } from "./TelemetryChartCanvas";
 
 interface TelemetryChartsPanelProps {
@@ -45,10 +46,10 @@ export function TelemetryChartsPanel({
 
   if (!projectedLap) {
     return (
-      <section className="telemetry-charts-panel" aria-label="Telemetry charts">
+      <section className="telemetry-charts-panel" aria-label={CHART_TEXT.title}>
         <div className="panel-heading">
-          <h2>Telemetry Charts</h2>
-          <p>Load a processed lap to view telemetry charts.</p>
+          <h2>{CHART_TEXT.title}</h2>
+          <p>{CHART_TEXT.empty}</p>
         </div>
       </section>
     );
@@ -70,20 +71,20 @@ export function TelemetryChartsPanel({
   }
 
   return (
-    <section className="telemetry-charts-panel" aria-label="Telemetry charts">
+    <section className="telemetry-charts-panel" aria-label={CHART_TEXT.title}>
       <div className="telemetry-charts-header">
         <div className="panel-heading">
-          <h2>Telemetry Charts</h2>
-          <p>{projectedLap.vehicle.displayName} - {projectedLap.sessionId || "Unknown session"}</p>
+          <h2>{CHART_TEXT.title}</h2>
+          <p>{projectedLap.vehicle.displayName} - {projectedLap.sessionId || CHART_TEXT.unknownSession}</p>
         </div>
-        <div className="telemetry-chart-controls" aria-label="Telemetry chart range">
-          <button className={rangeMode === "full" ? "active" : ""} type="button" onClick={() => setMode("full")}>Full lap</button>
-          <button className={rangeMode === "section" ? "active" : ""} type="button" onClick={() => setMode("section")}>Selected section</button>
-          <button disabled={!pinnedTelemetryPoint} type="button" onClick={() => onPinTelemetryPoint(null)}>Clear cursor</button>
+        <div className="telemetry-chart-controls" aria-label={CHART_TEXT.rangeLabel}>
+          <button className={rangeMode === "full" ? "active" : ""} type="button" onClick={() => setMode("full")}>{CHART_TEXT.fullLap}</button>
+          <button className={rangeMode === "section" ? "active" : ""} type="button" onClick={() => setMode("section")}>{CHART_TEXT.selectedSection}</button>
+          <button disabled={!pinnedTelemetryPoint} type="button" onClick={() => onPinTelemetryPoint(null)}>{CHART_TEXT.clearCursor}</button>
         </div>
       </div>
       <div className="telemetry-cursor-readout" aria-live="polite">
-        {cursorPoint ? <CursorValues point={cursorPoint} /> : <span>Move over a chart to inspect distance, section, lap time, and channel values.</span>}
+        {cursorPoint ? <CursorValues point={cursorPoint} /> : <span>{CHART_TEXT.cursorHelp}</span>}
       </div>
       <div className="telemetry-chart-stack">
         {TELEMETRY_CHANNELS.map((channel) => {
@@ -114,7 +115,7 @@ export function TelemetryChartsPanel({
         })}
       </div>
       <p className="telemetry-chart-description-text">
-        Effective driving trace uses non-superseded samples. Rewind markers remain event markers. Decimation is display-only and preserves extrema.
+        {CHART_TEXT.description}
       </p>
     </section>
   );
@@ -123,9 +124,9 @@ export function TelemetryChartsPanel({
 function CursorValues({ point }: { point: ProjectedLapPoint }) {
   return (
     <dl className="telemetry-cursor-values">
-      <div><dt>Distance</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
-      <div><dt>Section</dt><dd>{point.sectionId}</dd></div>
-      <div><dt>Lap time</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>
+      <div><dt>{CHART_TEXT.distance}</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
+      <div><dt>{CHART_TEXT.section}</dt><dd>{point.sectionId}</dd></div>
+      <div><dt>{CHART_TEXT.lapTime}</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>
       <div><dt>Speed</dt><dd>{point.speedKmh.toFixed(1)} km/h</dd></div>
       <div><dt>Throttle</dt><dd>{formatNullable(telemetryChannelValue(point, "throttle"), "%")}</dd></div>
       <div><dt>Brake</dt><dd>{formatNullable(telemetryChannelValue(point, "brake"), "%")}</dd></div>
