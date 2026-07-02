@@ -298,7 +298,8 @@
 - [x] Calculate total lap time.
 - [x] Calculate S1-S6 section timing.
 - [x] Export normalized lap data.
-- [x] Load projected-lap CSV in the browser.
+- [x] Load projected-lap CSV through Local Sessions in the browser.
+- [x] Remove unsupported manual processed-CSV loading from the normal UI.
 - [x] Render actual driven-path overlay.
 - [x] Replace Reference/Actual visibility toggles with automatic active course source selection.
 - [x] Display total lap time and selected-section time.

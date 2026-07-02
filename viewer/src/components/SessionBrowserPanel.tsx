@@ -133,6 +133,7 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
   const busy = Boolean(actionSessionId);
   const trashAvailable = selectedSession ? canTrashSession(selectedSession, loadedSessionId, busy) : false;
   const trashHelp = selectedSession ? trashAvailabilityText(selectedSession, loadedSessionId, busy) : "";
+  const selectedActionHelp = selectedSession ? actionHelp(selectedSession) : "";
   const dialogSession = sessions.find((session) => session.session_id === trashDialogSessionId);
 
   return (
@@ -179,7 +180,7 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
       {selectedSession ? (
         <div className="session-action-panel">
           <b>{selectedSession.session_id}</b>
-          <p className="status-text">{actionHelp(selectedSession)}</p>
+          {selectedActionHelp ? <p className="status-text">{selectedActionHelp}</p> : null}
           {action === "process" ? (
             <button className="command-button" disabled={busy} type="button" onClick={() => void processAndLoad(selectedSession)}>
               {actionSessionId === selectedSession.session_id ? SESSION_TEXT.processing : SESSION_TEXT.processAndLoad}
@@ -260,7 +261,7 @@ function actionForSession(session: SessionRecord): ActionKind {
 
 function actionHelp(session: SessionRecord): string {
   if (session.process_status === "processed") {
-    return SESSION_TEXT.actionReady;
+    return "";
   }
   if (session.process_status === "unprocessed" && ["completed", "legacy-ready"].includes(session.source_status)) {
     return SESSION_TEXT.actionProcess;

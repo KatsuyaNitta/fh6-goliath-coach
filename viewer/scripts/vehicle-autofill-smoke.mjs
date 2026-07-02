@@ -142,7 +142,7 @@ assert.match(sessionPanelSource, /await loadProcessedSession\(session\)/);
 assert.match(sessionPanelSource, /onClick=\{\(\) => setSelectedSessionId\(session\.session_id\)\}/);
 assert.doesNotMatch(sessionPanelSource, /setSelectedSessionId\(session\.session_id\)[\s\S]{0,120}onLoadProjectedLap/);
 assert.match(appSource, /loadedVehicleMetadata/);
-assert.match(appSource, /applyProjectedLap\(parsed, parsed\.sessionId\)/);
-assert.doesNotMatch(appSource, /handleProjectedLapFile[\s\S]*setLoadedVehicleMetadata/);
+assert.match(appSource, /onLoadProjectedLap=\{\(parsed, sessionId, vehicleMetadata\) => applyProjectedLap\(parsed, sessionId, vehicleMetadata\)\}/);
+assert.doesNotMatch(appSource, /handleProjectedLapFile|projectedLapInputRef|loadCsvManually/);
 
 console.log("vehicle autofill smoke test passed");

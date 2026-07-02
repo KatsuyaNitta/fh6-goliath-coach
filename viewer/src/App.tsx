@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReferencePayload, SectionDefinition, SectionId } from "./lib/reference";
 import { SECTION_COLORS, fetchReference } from "./lib/reference";
 import { CourseScene } from "./components/CourseScene";
 import { VehicleTunePanel } from "./components/VehicleTunePanel";
 import { SessionBrowserPanel } from "./components/SessionBrowserPanel";
 import { TelemetryChartsPanel } from "./components/TelemetryChartsPanel";
-import { classificationLabel, parseProjectedLapCsv, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
+import { classificationLabel, type ProjectedLapPayload, type ProjectedLapPoint, type RewindClusterPayload } from "./lib/telemetryLap";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { INITIAL_MAP_DISPLAY_MODE, shouldAutoRotateOverview, type MapDisplayMode } from "./lib/mapDisplayMode";
 import { sectionForRewindSelection } from "./lib/rewindSelection";
@@ -32,14 +32,12 @@ export function App() {
   const [projectedLap, setProjectedLap] = useState<ProjectedLapPayload | null>(null);
   const [loadedSessionId, setLoadedSessionId] = useState("");
   const [loadedVehicleMetadata, setLoadedVehicleMetadata] = useState<LoadedSessionVehicleMetadata | null>(null);
-  const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [showElevationContext, setShowElevationContext] = useState(true);
   const [showRewinds, setShowRewinds] = useState(true);
   const [selectedRewindClusterId, setSelectedRewindClusterId] = useState("");
   const [selectedRewindEventId, setSelectedRewindEventId] = useState("");
   const [hoveredTelemetryPoint, setHoveredTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
   const [pinnedTelemetryPoint, setPinnedTelemetryPoint] = useState<ProjectedLapPoint | null>(null);
-  const projectedLapInputRef = useRef<HTMLInputElement | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
@@ -170,25 +168,9 @@ export function App() {
     setSelectedRewindClusterId(firstRewindCluster?.clusterId ?? "");
     setSelectedRewindEventId("");
     setSelectedSectionId((current) => sectionForRewindSelection(current, firstRewindCluster?.sectionId));
-    setTelemetryError(null);
     setHoveredTelemetryPoint(null);
     setPinnedTelemetryPoint(null);
     setShowRewinds(parsed.rewindClusters.length > 0);
-  }
-
-  async function handleProjectedLapFile(file: File | undefined): Promise<void> {
-    if (!file) {
-      return;
-    }
-    try {
-      const text = await file.text();
-      const parsed = parseProjectedLapCsv(text, file.name);
-      applyProjectedLap(parsed, parsed.sessionId);
-    } catch (caught: unknown) {
-      setTelemetryError(caught instanceof Error ? caught.message : UI_TEXT.failedProjectedLap);
-      setHoveredTelemetryPoint(null);
-      setPinnedTelemetryPoint(null);
-    }
   }
 
   return (
@@ -271,24 +253,6 @@ export function App() {
         />
 
         <section className="telemetry-panel">
-          <div className="panel-heading">
-            <h2>{UI_TEXT.telemetryOverlay}</h2>
-            <p>{UI_TEXT.manualCsvDescription}</p>
-          </div>
-          <input
-            accept=".csv,text/csv"
-            className="hidden-input"
-            onChange={(event) => void handleProjectedLapFile(event.target.files?.[0])}
-            ref={projectedLapInputRef}
-            type="file"
-          />
-          <button
-            className="command-button"
-            type="button"
-            onClick={() => projectedLapInputRef.current?.click()}
-          >
-            {UI_TEXT.loadCsvManually}
-          </button>
           <label className="context-toggle">
             <input
               checked={showRewinds}
@@ -326,9 +290,8 @@ export function App() {
               </div>
             </dl>
           ) : (
-            <p className="status-text">{telemetryError ?? UI_TEXT.noProjectedLap}</p>
+            <p className="status-text">{UI_TEXT.noProjectedLap}</p>
           )}
-          {telemetryError && projectedLap ? <p className="status-text">{telemetryError}</p> : null}
         </section>
 
         <div className="segmented-group" aria-label={UI_TEXT.elevationScale}>

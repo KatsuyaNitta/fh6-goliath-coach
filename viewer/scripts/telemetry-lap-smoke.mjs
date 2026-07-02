@@ -117,7 +117,9 @@ assert.match(appSource, /setShowRewinds\(parsed\.rewindClusters\.length > 0\)/, 
 assert.doesNotMatch(appSource, /showReference|setShowReference/, "reference visibility should not be user-toggleable");
 assert.doesNotMatch(appSource, /showActual|setShowActual/, "actual visibility should not be user-toggleable");
 assert.doesNotMatch(appSource, /\{UI_TEXT\.reference\}|\{UI_TEXT\.actual\}/, "Reference and Actual layer labels should not be visible controls");
-assert.doesNotMatch(appSource, /setProjectedLap\(null\)/, "failed manual loads should not clear an existing valid lap");
+assert.doesNotMatch(appSource, /projectedLapInputRef|handleProjectedLapFile|loadCsvManually|manualCsvDescription/, "manual projected-lap CSV loading should not be exposed in the normal UI");
+assert.doesNotMatch(appSource, /accept="\.csv,text\/csv"|type="file"/, "normal UI should not include a processed-CSV file picker");
+assert.doesNotMatch(appSource, /setProjectedLap\(null\)/, "failed supported loads should not clear an existing valid lap");
 assert.match(appSource, /checked=\{showRewinds\}[\s\S]*setShowRewinds\(event\.target\.checked\)/, "rewind visibility should keep its own control");
 assert.match(sceneSource, /activeCourseRenderSource\(projectedLap\)/, "course source should be derived internally");
 assert.match(sceneSource, /showReferenceCourse = renderSource === "reference-fallback"/, "reference should be visible only as fallback");

@@ -151,10 +151,13 @@ assert.match(componentSource, /refreshSessions\(\)/, "successful trash should re
 assert.match(componentSource, /process_status === "processed"[\s\S]*SESSION_TEXT\.processedProtected/, "processed sessions should not expose an enabled trash action");
 assert.match(componentSource, /process_status === "partial"[\s\S]*SESSION_TEXT\.partialTrashBlocked/, "partial sessions should not expose an enabled trash action");
 assert.match(componentSource, /session\.session_id !== loadedSessionId/, "loaded sessions should not be trashable");
-assert.match(appSource, /UI_TEXT\.loadCsvManually/, "manual CSV loading should remain available");
+assert.doesNotMatch(appSource, /UI_TEXT\.loadCsvManually|manualCsvDescription|projectedLapInputRef|handleProjectedLapFile/, "manual CSV loading should not appear in the normal UI");
+assert.doesNotMatch(appSource, /accept="\.csv,text\/csv"|type="file"/, "normal UI should not expose a processed-CSV file picker");
 assert.match(componentSource, /SESSION_TEXT\.serviceUnavailable/, "service unavailable should be nonfatal and visible");
 assert.match(componentSource, /loadedSessionId/, "selected and loaded session state should be separate");
 assert.match(componentSource, /parseProjectedLapCsv/, "API-loaded CSV should use the existing parser");
+assert.match(componentSource, /process_status === "processed"[\s\S]*return ""/, "processed sessions should not show redundant ready-state copy");
+assert.match(componentSource, /selectedActionHelp \? <p className="status-text">\{selectedActionHelp\}<\/p> : null/, "session help text should render only when meaningful");
 assert.match(componentSource, /catch \(error\)[\s\S]*setErrorText[\s\S]*finally/, "API failure should report an error without clearing parent telemetry");
 assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/, "default elevation should remain 5x");
 console.log("session API smoke test passed");

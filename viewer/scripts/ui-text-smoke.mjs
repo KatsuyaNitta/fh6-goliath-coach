@@ -34,11 +34,9 @@ const {
   uiText,
 } = uiTextModule;
 
-assert.equal(UI_TEXT_CONTRACT.length, 161);
-assert.equal(new Set(UI_TEXT_CONTRACT.map((entry) => entry.id)).size, 161);
-for (let index = 1; index <= 161; index += 1) {
-  assert.ok(UI_TEXT_CONTRACT.some((entry) => entry.id === `UI-${String(index).padStart(3, "0")}`));
-}
+assert.equal(UI_TEXT_CONTRACT.length, 157);
+assert.equal(new Set(UI_TEXT_CONTRACT.map((entry) => entry.id)).size, 157);
+assert.doesNotMatch(JSON.stringify(UI_TEXT_CONTRACT), /Processed output is ready for browser loading|Load a processed projected-lap CSV manually|Load CSV manually|Telemetry Overlay/);
 
 assert.deepEqual([...KEEP_ENGLISH_TEXTS], [
   "FH6 Goliath Coach",

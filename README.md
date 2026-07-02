@@ -225,7 +225,7 @@ Open the local URL printed by Vite. The app loads:
 /reference/goliath_reference.json
 ```
 
-Use the **Load CSV manually** control to select a generated `projected-lap.csv`. After a valid file is loaded, the actual driven path becomes the normal visible course representation.
+Use the Local Sessions panel to load telemetry through the supported local web service. **Load** fetches an already processed projected-lap CSV, and **Process & Load** explicitly processes an eligible local session before loading it. After a valid processed session is loaded, the actual driven path becomes the normal visible course representation.
 
 ## Frontend Tests
 
@@ -234,7 +234,7 @@ cd viewer
 pnpm run test
 ```
 
-The frontend smoke test checks generated reference data, camera transforms, vehicle/tune metadata constraints, and projected-lap CSV loading.
+The frontend smoke test checks generated reference data, camera transforms, vehicle/tune metadata constraints, Local Session projected-lap loading, and legacy projected-lap CSV parser compatibility.
 
 ## Production Build
 
