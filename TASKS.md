@@ -98,7 +98,7 @@
 - Telemetry charts MVP is implemented for Speed, Throttle, Brake, and Steering; advanced channels and corner identification remain incomplete.
 - Driving-quality analysis is not implemented.
 - AI explanations are not implemented.
-- The 2D map view requires a dedicated repair pass.
+- The old 2D toggle is hidden for now; a dedicated top-down analysis view may be reconsidered later only when it serves a clear task such as lap-to-lap line comparison, corner entry/apex/exit inspection, or braking-point comparison.
 - `projected-lap.csv` is approximately 42 MB and should later have a lighter browser-specific representation.
 - Section-boundary timing should later use interpolation.
 - `.gitignore` contains a leading UTF-8 BOM.
@@ -217,7 +217,7 @@
 - [x] Add camera reset.
 - [x] Camera reset places START side near and mountain side far.
 - [ ] Add fullscreen mode.
-- [x] Add 2D/3D toggle.
+- [x] Keep the normal viewer in 3D; the unused 2D/3D toggle is hidden for now.
 - [x] Add elevation-scale slider.
 - [x] Add grid.
 - [x] Add direction indicator.
@@ -619,7 +619,7 @@ For each corner or analysis zone:
 6. [ ] Produce a lightweight browser-specific lap dataset.
 7. [ ] Interpolate section-boundary crossing times.
 8. [ ] Add manual review/selection tools for unsupported or ambiguous multi-lap recordings.
-9. [ ] Repair and separate the 2D orthographic map view.
+9. [ ] Reconsider a dedicated top-down analysis view only when it has a clear analytical purpose.
 10. [ ] Begin Milestone C with a vehicle marker and basic replay controls.
 
 ---

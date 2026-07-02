@@ -13,7 +13,7 @@ import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 import { UI_TEXT } from "./lib/uiText";
 import type { LoadedSessionVehicleMetadata } from "./lib/vehicleAutofill";
 
-type ViewMode = "3d" | "2d";
+type ViewMode = "3d";
 interface SectionFocusRequest {
   sectionId: SectionId;
   requestId: number;
@@ -24,7 +24,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<SectionId>("S1");
   const [elevationScale, setElevationScale] = useState(5);
-  const [viewMode, setViewMode] = useState<ViewMode>("3d");
+  const viewMode: ViewMode = "3d";
   const [mapDisplayMode, setMapDisplayMode] = useState<MapDisplayMode>(INITIAL_MAP_DISPLAY_MODE);
   const [sectionFocusRequest, setSectionFocusRequest] = useState<SectionFocusRequest | null>(null);
   const [overviewRotationStopped, setOverviewRotationStopped] = useState(false);
@@ -247,25 +247,6 @@ export function App() {
         <div className="title-block">
           <h1>{UI_TEXT.appName}</h1>
           <p>{UI_TEXT.appDescription}</p>
-        </div>
-
-        <div className="control-row">
-          <button
-            className={viewMode === "3d" ? "active" : ""}
-            aria-pressed={viewMode === "3d"}
-            type="button"
-            onClick={() => setViewMode("3d")}
-          >
-            {UI_TEXT.view3d}
-          </button>
-          <button
-            className={viewMode === "2d" ? "active" : ""}
-            aria-pressed={viewMode === "2d"}
-            type="button"
-            onClick={() => setViewMode("2d")}
-          >
-            {UI_TEXT.view2d}
-          </button>
         </div>
 
         <div className="segmented-group two-up" aria-label={UI_TEXT.mapDisplayMode}>

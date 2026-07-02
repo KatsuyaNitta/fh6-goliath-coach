@@ -20,6 +20,25 @@ const { getSectionFocusCameraPose, SECTION_FOCUS_CAMERA_PRESETS } = sectionFocus
 
 const sectionIds = ["S1", "S2", "S3", "S4", "S5", "S6"];
 assert.deepEqual(Object.keys(SECTION_FOCUS_CAMERA_PRESETS), sectionIds);
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S1, { azimuthOffsetRad: -0.42, polarAngleRad: 1.14, distanceScale: 1.02, targetBlendToOverview: 0.18 });
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S2, {
+  azimuthOffsetRad: -1.75,
+  polarAngleRad: 0.866,
+  distanceScale: 0.65,
+  targetBlendToOverview: 0.164,
+  targetOffsetRight: -500,
+  targetOffsetUp: 0,
+});
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S3, { azimuthOffsetRad: Math.PI + 0.34, polarAngleRad: 1.1, distanceScale: 1.02, targetBlendToOverview: 0.2 });
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S4, { azimuthOffsetRad: -0.16, polarAngleRad: 1.12, distanceScale: 1.08, targetBlendToOverview: 0.16 });
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S5, { azimuthOffsetRad: 0.58, polarAngleRad: 0.98, distanceScale: 1.02, targetBlendToOverview: 0.22 });
+assert.deepEqual(SECTION_FOCUS_CAMERA_PRESETS.S6, { azimuthOffsetRad: -0.54, polarAngleRad: 0.98, distanceScale: 1.02, targetBlendToOverview: 0.2 });
+assert.notDeepEqual(SECTION_FOCUS_CAMERA_PRESETS.S2, {
+  azimuthOffsetRad: -0.3,
+  polarAngleRad: 1.08,
+  distanceScale: 1.14,
+  targetBlendToOverview: 0,
+});
 
 const pointColumns = Object.fromEntries(referencePayload.point_columns.map((name, index) => [name, index]));
 const baselineDisplayY = referencePayload.coordinate_system.relative_elevation.baseline_display_y;

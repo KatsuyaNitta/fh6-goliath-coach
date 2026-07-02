@@ -10,6 +10,8 @@ export interface SectionFocusCameraPreset {
   polarAngleRad: number;
   distanceScale: number;
   targetBlendToOverview: number;
+  targetOffsetRight?: number;
+  targetOffsetUp?: number;
 }
 
 export interface SectionFocusCameraPose {
@@ -32,7 +34,14 @@ export interface SectionFocusCameraInputs {
 
 export const SECTION_FOCUS_CAMERA_PRESETS: Record<SectionId, SectionFocusCameraPreset> = {
   S1: { azimuthOffsetRad: -0.42, polarAngleRad: 1.14, distanceScale: 1.02, targetBlendToOverview: 0.18 },
-  S2: { azimuthOffsetRad: 0.36, polarAngleRad: 1.08, distanceScale: 1.02, targetBlendToOverview: 0.2 },
+  S2: {
+    azimuthOffsetRad: -1.75,
+    polarAngleRad: 0.866,
+    distanceScale: 0.65,
+    targetBlendToOverview: 0.164,
+    targetOffsetRight: -500,
+    targetOffsetUp: 0,
+  },
   S3: { azimuthOffsetRad: Math.PI + 0.34, polarAngleRad: 1.1, distanceScale: 1.02, targetBlendToOverview: 0.2 },
   S4: { azimuthOffsetRad: -0.16, polarAngleRad: 1.12, distanceScale: 1.08, targetBlendToOverview: 0.16 },
   S5: { azimuthOffsetRad: 0.58, polarAngleRad: 0.98, distanceScale: 1.02, targetBlendToOverview: 0.22 },
@@ -77,7 +86,6 @@ export function getSectionFocusCameraPose(inputs: SectionFocusCameraInputs): Sec
   horizontalFromOverview.normalize();
   horizontalFromOverview.applyAxisAngle(new THREE.Vector3(0, 1, 0), preset.azimuthOffsetRad);
 
-  const target = sectionCentroid.clone().lerp(overviewTarget, preset.targetBlendToOverview);
   const polarAngle = clamp(preset.polarAngleRad, 0.55, Math.PI / 2 - 0.08);
   const sinPolar = Math.sin(polarAngle);
   const cosPolar = Math.cos(polarAngle);
@@ -92,6 +100,11 @@ export function getSectionFocusCameraPose(inputs: SectionFocusCameraInputs): Sec
   }
   right.normalize();
   const cameraUp = new THREE.Vector3().crossVectors(right, forward).normalize();
+  const target = sectionCentroid
+    .clone()
+    .lerp(overviewTarget, preset.targetBlendToOverview)
+    .addScaledVector(right, preset.targetOffsetRight ?? 0)
+    .addScaledVector(cameraUp, preset.targetOffsetUp ?? 0);
 
   const aspect = Math.max(MIN_ASPECT, inputs.aspect);
   const fullContextDistance = perspectiveFitDistance(fullPoints, target, forward, right, cameraUp, aspect, FULL_CONTEXT_FIT_MARGIN);

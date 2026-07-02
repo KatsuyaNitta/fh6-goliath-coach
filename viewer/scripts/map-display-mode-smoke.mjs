@@ -80,6 +80,10 @@ const lifecycleSource = await readFile(new URL("../src/lib/cameraLifecycle.ts", 
 const reducedMotionSource = await readFile(new URL("../src/lib/useReducedMotion.ts", import.meta.url), "utf-8");
 
 assert.match(appSource, /useState<MapDisplayMode>\(INITIAL_MAP_DISPLAY_MODE\)/);
+assert.match(appSource, /const viewMode: ViewMode = "3d"/);
+assert.doesNotMatch(appSource, /setViewMode/);
+assert.doesNotMatch(appSource, /UI_TEXT\.view2d/);
+assert.doesNotMatch(appSource, /UI_TEXT\.view3d/);
 assert.match(appSource, /aria-label=\{UI_TEXT\.mapDisplayMode\}/);
 assert.match(appSource, /\{UI_TEXT\.overview\}/);
 assert.match(appSource, /\{UI_TEXT\.sectionFocus\}/);
