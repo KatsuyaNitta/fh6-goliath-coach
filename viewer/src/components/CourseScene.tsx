@@ -14,6 +14,7 @@ import { getCameraUpVector, getCanonical3DAnalysisCameraPosition, getTopDownCame
 import { OVERVIEW_AUTO_ROTATE_SPEED, type MapDisplayMode } from "../lib/mapDisplayMode";
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
 import { getSectionFocusCameraPose } from "../lib/sectionFocusCamera";
+import { activeCourseRenderSource, renderableLapPoints } from "../lib/courseRenderSource";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 import { UI_TEXT } from "../lib/uiText";
 
@@ -46,8 +47,6 @@ interface CourseSceneProps {
   overviewAutoRotate: boolean;
   sectionFocusRequest?: SectionFocusRequest | null;
   projectedLap?: ProjectedLapPayload | null;
-  showReference: boolean;
-  showActual: boolean;
   showElevationContext: boolean;
   showRewinds: boolean;
   selectedRewindClusterId: string;
@@ -65,8 +64,6 @@ export function CourseScene({
   overviewAutoRotate,
   sectionFocusRequest,
   projectedLap,
-  showReference,
-  showActual,
   showElevationContext,
   showRewinds,
   selectedRewindClusterId,
@@ -117,8 +114,6 @@ export function CourseScene({
         baselineDisplayY={baselineDisplayY}
         selectedSectionId={selectedSectionId}
         mapDisplayMode={mapDisplayMode}
-        showReference={showReference}
-        showActual={showActual}
         showRewinds={showRewinds}
         selectedRewindClusterId={selectedRewindClusterId}
         onSelectRewindCluster={onSelectRewindCluster}
@@ -434,8 +429,6 @@ function CourseLines({
   baselineDisplayY,
   selectedSectionId,
   mapDisplayMode,
-  showReference,
-  showActual,
   showRewinds,
   selectedRewindClusterId,
   onSelectRewindCluster,
@@ -447,8 +440,6 @@ function CourseLines({
   baselineDisplayY: number;
   selectedSectionId: SectionId;
   mapDisplayMode: MapDisplayMode;
-  showReference: boolean;
-  showActual: boolean;
   showRewinds: boolean;
   selectedRewindClusterId: string;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
@@ -467,13 +458,16 @@ function CourseLines({
 
   const actualSectionPoints = useMemo(() => {
     const grouped = new Map<SectionId, ProjectedLapPoint[]>();
-    for (const point of projectedLap?.effectivePoints ?? []) {
+    for (const point of renderableLapPoints(projectedLap)) {
       const points = grouped.get(point.sectionId) ?? [];
       points.push(point);
       grouped.set(point.sectionId, points);
     }
     return grouped;
   }, [projectedLap]);
+  const renderSource = activeCourseRenderSource(projectedLap);
+  const showReferenceCourse = renderSource === "reference-fallback";
+  const showActualCourse = renderSource === "loaded-actual" && Boolean(projectedLap);
 
   const markerPoints = useMemo(() => {
     return reference.markers
@@ -486,10 +480,22 @@ function CourseLines({
 
   const startPoint = reference.points[0];
   const finishPoint = reference.points[reference.points.length - 1];
+  const actualRenderPoints = useMemo(() => renderableLapPoints(projectedLap), [projectedLap]);
+  const actualMarkersById = useMemo(() => {
+    const markers = new Map<string, ProjectedLapPoint>();
+    for (const point of projectedLap?.markers ?? []) {
+      if (!markers.has(point.manualMarkerId)) {
+        markers.set(point.manualMarkerId, point);
+      }
+    }
+    return markers;
+  }, [projectedLap]);
+  const actualStartPoint = actualMarkersById.get("START") ?? actualRenderPoints[0];
+  const actualFinishPoint = actualMarkersById.get("FINISH") ?? actualRenderPoints[actualRenderPoints.length - 1];
 
   return (
     <group>
-      {showReference ? reference.sections.flatMap((section) => {
+      {showReferenceCourse ? reference.sections.flatMap((section) => {
         const points = sectionPoints.get(section.id) ?? [];
         const renderedPoints = points.map((point) => referencePointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
@@ -519,7 +525,7 @@ function CourseLines({
           mainLine,
         ];
       }) : null}
-      {showActual && projectedLap ? reference.sections.flatMap((section) => {
+      {showActualCourse && projectedLap ? reference.sections.flatMap((section) => {
         const points = actualSectionPoints.get(section.id) ?? [];
         if (points.length === 0) {
           return [];
@@ -552,7 +558,7 @@ function CourseLines({
           mainLine,
         ];
       }) : null}
-      {markerPoints.map(({ marker, point }) => {
+      {showReferenceCourse ? markerPoints.map(({ marker, point }) => {
         const isBoundary = mapDisplayMode === "overview" ? true : markerTouchesSection(marker, selectedSectionId);
         return (
           <Marker
@@ -567,17 +573,21 @@ function CourseLines({
             scale={isBoundary ? 1.12 : 0.78}
           />
         );
-      })}
-      {showActual && projectedLap ? projectedLap.markers.map((point) => {
+      }) : null}
+      {showActualCourse && projectedLap ? markerPoints.map(({ marker, point: fallbackPoint }) => {
+        const actualPoint = actualMarkersById.get(marker.id);
         const isBoundary = mapDisplayMode === "overview"
           ? true
-          : actualMarkerTouchesSection(reference, point.manualMarkerId, selectedSectionId);
+          : markerTouchesSection(marker, selectedSectionId);
         return (
           <Marker
             color={isBoundary ? "#f8fafc" : MUTED_MARKER_COLOR}
-            key={`actual-marker-${point.manualMarkerId}-${point.sourceRowIndex}`}
-            label={point.manualMarkerId}
-            position={projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY)}
+            key={`actual-marker-${marker.id}`}
+            label={marker.label}
+            point={actualPoint ? undefined : fallbackPoint}
+            position={actualPoint ? projectedLapPointToRenderVector(actualPoint, elevationScale, baselineDisplayY) : undefined}
+            elevationScale={elevationScale}
+            baselineDisplayY={baselineDisplayY}
             labelDimmed={!isBoundary}
             opacity={isBoundary ? 1 : 0.38}
             scale={isBoundary ? 1.12 : 0.78}
@@ -594,20 +604,38 @@ function CourseLines({
           selected={cluster.clusterId === selectedRewindClusterId}
         />
       )) : null}
-      <Marker
-        color="#35f28b"
-        label="START"
-        point={startPoint}
-        elevationScale={elevationScale}
-        baselineDisplayY={baselineDisplayY}
-      />
-      <Marker
-        color="#ff4f64"
-        label="FINISH"
-        point={finishPoint}
-        elevationScale={elevationScale}
-        baselineDisplayY={baselineDisplayY}
-      />
+      {showReferenceCourse ? (
+        <>
+          <Marker
+            color="#35f28b"
+            label="START"
+            point={startPoint}
+            elevationScale={elevationScale}
+            baselineDisplayY={baselineDisplayY}
+          />
+          <Marker
+            color="#ff4f64"
+            label="FINISH"
+            point={finishPoint}
+            elevationScale={elevationScale}
+            baselineDisplayY={baselineDisplayY}
+          />
+        </>
+      ) : null}
+      {showActualCourse && actualStartPoint ? (
+        <Marker
+          color="#35f28b"
+          label="START"
+          position={projectedLapPointToRenderVector(actualStartPoint, elevationScale, baselineDisplayY)}
+        />
+      ) : null}
+      {showActualCourse && actualFinishPoint ? (
+        <Marker
+          color="#ff4f64"
+          label="FINISH"
+          position={projectedLapPointToRenderVector(actualFinishPoint, elevationScale, baselineDisplayY)}
+        />
+      ) : null}
     </group>
   );
 }
@@ -692,15 +720,6 @@ function markerTouchesSection(
   selectedSectionId: SectionId,
 ): boolean {
   return marker.from_section_id === selectedSectionId || marker.to_section_id === selectedSectionId;
-}
-
-function actualMarkerTouchesSection(
-  reference: ReferencePayload,
-  markerId: string,
-  selectedSectionId: SectionId,
-): boolean {
-  const referenceMarker = reference.markers.find((marker) => marker.id === markerId);
-  return referenceMarker ? markerTouchesSection(referenceMarker, selectedSectionId) : false;
 }
 
 function Marker({

@@ -33,6 +33,10 @@ const { classificationLabel, parseProjectedLapCsv } = await compileModule(
   new URL("../src/lib/telemetryLap.ts", import.meta.url),
   "telemetryLap.mjs",
 );
+const { activeCourseRenderSource, renderableLapPoints } = await compileModule(
+  new URL("../src/lib/courseRenderSource.ts", import.meta.url),
+  "courseRenderSource.mjs",
+);
 
 const oldCsv = [
   "source_row_index,timestamp_s,lap_time_s,course_distance_m,section_id,projection_error_m,reference_index,uncertain_mapping,position_x,position_y,position_z,telemetry_display_x,telemetry_display_y,telemetry_display_z,speed_kmh,manual_marker_id,exclude_from_driving_analysis",
@@ -54,6 +58,9 @@ assert.equal(oldPayload.totalLapTimeS, 5);
 assert.equal(oldPayload.vehicle.displayName, "Unknown vehicle");
 assert.equal(oldPayload.vehicle.identificationSource, "unknown");
 assert.deepEqual(oldPayload.sectionSummaries.map((section) => section.sectionId), ["S1", "S2", "S3", "S4", "S5", "S6"]);
+assert.equal(activeCourseRenderSource(null), "reference-fallback");
+assert.equal(activeCourseRenderSource(oldPayload), "loaded-actual");
+assert.equal(renderableLapPoints(oldPayload).length, oldPayload.effectivePoints.length);
 
 const rewindCsv = [
   "source_row_index,timestamp_s,lap_time_s,course_distance_m,section_id,projection_error_m,reference_index,uncertain_mapping,position_x,position_y,position_z,telemetry_display_x,telemetry_display_y,telemetry_display_z,speed_kmh,manual_marker_id,exclude_from_driving_analysis,is_effective,superseded_by_rewind_event_id,rewind_event_id,rewind_cluster_id,rewind_classification,rewind_confidence,rewind_impact_direction,rewound_time_s,rewound_course_distance_m",
@@ -92,6 +99,7 @@ assert.equal(vehiclePayload.vehicle.identificationSource, "community_catalog");
 assert.equal(vehiclePayload.vehicle.catalogSha256, "abc123");
 assert.equal(vehiclePayload.rewindEvents.length, 1);
 assert.equal(vehiclePayload.effectivePoints.length, 2);
+assert.equal(activeCourseRenderSource(vehiclePayload), "loaded-actual");
 
 const ordinalOnlyCsv = vehicleCsv.replace("2020 Lamborghini Essenza SCV12,2020-lamborghini-essenza-scv12,3606,community_catalog,abc123", ",,3606,,");
 const ordinalOnlyPayload = parseProjectedLapCsv(ordinalOnlyCsv, "car-3606_projected-lap.csv");
@@ -99,13 +107,22 @@ assert.equal(ordinalOnlyPayload.vehicle.displayName, "Car 3606");
 assert.equal(ordinalOnlyPayload.vehicle.filenameSlug, "car-3606");
 assert.equal(ordinalOnlyPayload.vehicle.identificationSource, "ordinal_fallback");
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf-8");
+const sceneSource = await readFile(new URL("../src/components/CourseScene.tsx", import.meta.url), "utf-8");
 assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/, "elevation scale should default to 5x");
 assert.match(appSource, /<dt>\{UI_TEXT\.vehicle\}<\/dt>/, "Telemetry Overlay should show a vehicle row");
 assert.match(appSource, /projectedLap\.vehicle\.displayName/, "Telemetry Overlay should display vehicle metadata from the CSV");
 assert.match(appSource, /className="vehicle-name"/, "vehicle names should have wrapping-friendly styling hook");
 assert.match(appSource, /const \[showRewinds, setShowRewinds\] = useState\(true\)/, "rewind toggle state should start enabled");
 assert.match(appSource, /setShowRewinds\(parsed\.rewindClusters\.length > 0\)/, "rewind toggle should default on only when data exists");
-assert.match(appSource, /checked=\{showReference\}[\s\S]*setShowReference\(event\.target\.checked\)/, "reference visibility should keep its own control");
-assert.match(appSource, /checked=\{showActual\}[\s\S]*setShowActual\(event\.target\.checked\)/, "actual visibility should keep its own control");
+assert.doesNotMatch(appSource, /showReference|setShowReference/, "reference visibility should not be user-toggleable");
+assert.doesNotMatch(appSource, /showActual|setShowActual/, "actual visibility should not be user-toggleable");
+assert.doesNotMatch(appSource, /\{UI_TEXT\.reference\}|\{UI_TEXT\.actual\}/, "Reference and Actual layer labels should not be visible controls");
+assert.doesNotMatch(appSource, /setProjectedLap\(null\)/, "failed manual loads should not clear an existing valid lap");
 assert.match(appSource, /checked=\{showRewinds\}[\s\S]*setShowRewinds\(event\.target\.checked\)/, "rewind visibility should keep its own control");
+assert.match(sceneSource, /activeCourseRenderSource\(projectedLap\)/, "course source should be derived internally");
+assert.match(sceneSource, /showReferenceCourse = renderSource === "reference-fallback"/, "reference should be visible only as fallback");
+assert.match(sceneSource, /showActualCourse = renderSource === "loaded-actual"/, "actual trace should be visible after a valid lap");
+assert.match(sceneSource, /renderableLapPoints\(projectedLap\)/, "legacy spatial CSV should render even with missing optional channels");
+assert.match(sceneSource, /actualStartPoint = actualMarkersById\.get\("START"\) \?\? actualRenderPoints\[0\]/, "actual start marker should fall back to the trace start");
+assert.match(sceneSource, /actualFinishPoint = actualMarkersById\.get\("FINISH"\) \?\? actualRenderPoints\[actualRenderPoints\.length - 1\]/, "actual finish marker should fall back to the trace end");
 console.log("telemetry lap loader smoke test passed");

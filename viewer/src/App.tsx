@@ -33,8 +33,6 @@ export function App() {
   const [loadedSessionId, setLoadedSessionId] = useState("");
   const [loadedVehicleMetadata, setLoadedVehicleMetadata] = useState<LoadedSessionVehicleMetadata | null>(null);
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
-  const [showReference, setShowReference] = useState(true);
-  const [showActual, setShowActual] = useState(true);
   const [showElevationContext, setShowElevationContext] = useState(true);
   const [showRewinds, setShowRewinds] = useState(true);
   const [selectedRewindClusterId, setSelectedRewindClusterId] = useState("");
@@ -175,7 +173,6 @@ export function App() {
     setTelemetryError(null);
     setHoveredTelemetryPoint(null);
     setPinnedTelemetryPoint(null);
-    setShowActual(true);
     setShowRewinds(parsed.rewindClusters.length > 0);
   }
 
@@ -189,8 +186,6 @@ export function App() {
       applyProjectedLap(parsed, parsed.sessionId);
     } catch (caught: unknown) {
       setTelemetryError(caught instanceof Error ? caught.message : UI_TEXT.failedProjectedLap);
-      setProjectedLap(null);
-      setLoadedSessionId("");
       setHoveredTelemetryPoint(null);
       setPinnedTelemetryPoint(null);
     }
@@ -212,8 +207,6 @@ export function App() {
               overviewAutoRotate={overviewAutoRotate}
               sectionFocusRequest={sectionFocusRequest}
               projectedLap={projectedLap}
-              showReference={showReference}
-              showActual={showActual}
               showElevationContext={showElevationContext}
               showRewinds={showRewinds && Boolean(projectedLap?.rewindClusters.length)}
               selectedRewindClusterId={selectedRewindClusterId}
@@ -296,25 +289,6 @@ export function App() {
           >
             {UI_TEXT.loadCsvManually}
           </button>
-          <div className="toggle-row">
-            <label>
-              <input
-                checked={showReference}
-                onChange={(event) => setShowReference(event.target.checked)}
-                type="checkbox"
-              />
-              {UI_TEXT.reference}
-            </label>
-            <label>
-              <input
-                checked={showActual}
-                disabled={!projectedLap}
-                onChange={(event) => setShowActual(event.target.checked)}
-                type="checkbox"
-              />
-              {UI_TEXT.actual}
-            </label>
-          </div>
           <label className="context-toggle">
             <input
               checked={showRewinds}

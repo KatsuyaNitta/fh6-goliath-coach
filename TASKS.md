@@ -48,7 +48,7 @@
 - [x] Selected section uses its original color, thicker line, and halo.
 - [x] Non-selected sections are gray and dimmed.
 - [x] Selected section boundary markers are emphasized.
-- [x] Reference and actual telemetry paths use consistent selection emphasis.
+- [x] Normal viewer automatically shows the reference path before a lap is loaded and the actual trace after a valid lap is loaded.
 - [x] Overview map mode frames the full course, renders S1-S6 with equal emphasis, uses slow 3D automatic rotation, and stops rotation on manual camera interaction.
 - [x] Section Focus uses deterministic section-specific 3D camera framing and mode-aware Reset camera.
 - [x] Japanese UI Phase 1 is implemented with centralized UI text, Japanese-first labels, intentional English telemetry labels, and display-only unit labels `PS`, `NM`, `KG`, `KGF/MM`, and `cm`.
@@ -70,7 +70,7 @@
 - [x] Processed output generation.
 - [x] Projected-lap CSV browser loading.
 - [x] Actual driven-path overlay.
-- [x] Reference/Actual visibility toggles.
+- [x] Reference/Actual visibility toggles replaced by automatic reference-fallback / loaded-actual rendering.
 - [x] Total lap time and selected-section time display.
 - [x] Actual P1-P5 marker display.
 - [x] Selected actual-lap segment highlighting.
@@ -227,7 +227,7 @@
 - [x] Selected section keeps original color with thicker line and halo.
 - [x] Non-selected sections are gray and dimmed.
 - [x] Selected section boundary markers are emphasized.
-- [x] Reference and actual telemetry paths use consistent selection emphasis.
+- [x] Active course source uses consistent Overview and Section Focus emphasis.
 - [x] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
 - [x] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover does not move camera; same-section chart pin preserves manual camera composition.
 - [ ] Corner Focus camera mode and corner-specific framing.
@@ -300,7 +300,7 @@
 - [x] Export normalized lap data.
 - [x] Load projected-lap CSV in the browser.
 - [x] Render actual driven-path overlay.
-- [x] Add Reference/Actual visibility toggles.
+- [x] Replace Reference/Actual visibility toggles with automatic active course source selection.
 - [x] Display total lap time and selected-section time.
 - [x] Display actual P1-P5 markers.
 - [x] Highlight selected actual-lap segment.
