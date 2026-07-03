@@ -34,6 +34,12 @@ const {
   uiText,
 } = uiTextModule;
 
+assert.equal(UI_TEXT.courseColorSection, "Section");
+assert.equal(UI_TEXT.courseColorGradient, "勾配");
+assert.equal(UI_TEXT.courseColorCurvature, "曲率");
+assert.equal(UI_TEXT.speed, "速度");
+assert.equal(UI_TEXT.speedUnavailable, "速度不明");
+
 assert.equal(UI_TEXT_CONTRACT.length, 164);
 assert.equal(new Set(UI_TEXT_CONTRACT.map((entry) => entry.id)).size, 164);
 assert.doesNotMatch(JSON.stringify(UI_TEXT_CONTRACT), /Processed output is ready for browser loading|Load a processed projected-lap CSV manually|Load CSV manually|Telemetry Overlay/);

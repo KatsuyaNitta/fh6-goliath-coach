@@ -5,6 +5,11 @@ import json
 import sys
 from pathlib import Path
 
+from goliath.reference.geometry import (
+    DEFAULT_OUTPUT_PATH as DEFAULT_COURSE_GEOMETRY_OUTPUT_PATH,
+    GeometrySettings,
+    build_course_geometry_json,
+)
 from goliath.reference.exporter import build_reference_json
 from goliath.sessions import (
     DEFAULT_PROCESSED_ROOT,
@@ -39,6 +44,23 @@ def main() -> None:
         default=Path("viewer/public/reference/goliath_reference.json"),
         help="Browser-facing JSON output path.",
     )
+
+    build_geometry = subparsers.add_parser("build-course-geometry")
+    build_geometry.add_argument(
+        "input_csv",
+        type=Path,
+        help="Path to the 1 m Goliath sampled driving path CSV.",
+    )
+    build_geometry.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_COURSE_GEOMETRY_OUTPUT_PATH,
+        help="Browser-facing course geometry JSON output path.",
+    )
+    build_geometry.add_argument("--half-window-m", type=float, default=15.0)
+    build_geometry.add_argument("--stability-half-window-m", type=float, default=25.0)
+    build_geometry.add_argument("--straight-curvature-threshold-1pm", type=float, default=0.0005)
+    build_geometry.add_argument("--flat-gradient-threshold-pct", type=float, default=0.5)
 
     update_catalog = subparsers.add_parser("update-vehicle-catalog")
     update_catalog.add_argument("--source-url", default=DEFAULT_SOURCE_URL)
@@ -118,6 +140,8 @@ def main() -> None:
     try:
         if args.command == "build-reference":
             _run_build_reference(args)
+        elif args.command == "build-course-geometry":
+            _run_build_course_geometry(args)
         elif args.command == "update-vehicle-catalog":
             _run_update_catalog(args)
         elif args.command == "process-session":
@@ -152,6 +176,23 @@ def _run_build_reference(args: argparse.Namespace) -> None:
     point_count = len(payload["points"])  # type: ignore[arg-type]
     finish_m = payload["start_finish"]["finish_course_distance_m"]  # type: ignore[index]
     print(f"wrote {args.output} with {point_count} points; finish={finish_m:.3f} m")
+
+
+def _run_build_course_geometry(args: argparse.Namespace) -> None:
+    settings = GeometrySettings(
+        half_window_m=args.half_window_m,
+        stability_half_window_m=args.stability_half_window_m,
+        straight_curvature_threshold_1pm=args.straight_curvature_threshold_1pm,
+        flat_gradient_threshold_pct=args.flat_gradient_threshold_pct,
+    )
+    payload = build_course_geometry_json(args.input_csv, args.output, settings)
+    source = payload["source"]
+    summary = payload["quality_summary"]
+    print(
+        f"wrote {args.output} with {source['point_count']} points; "
+        f"finish={source['finish_course_distance_m']:.3f} m; "
+        f"valid_curvature={summary['valid_curvature_count']}"
+    )
 
 
 def _run_update_catalog(args: argparse.Namespace) -> None:

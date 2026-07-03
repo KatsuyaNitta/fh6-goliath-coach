@@ -5,6 +5,7 @@ await import("./vehicle-autofill-smoke.mjs");
 await import("./vehicle-identity-smoke.mjs");
 await import("./render-coordinate-smoke.mjs");
 await import("./relative-elevation-smoke.mjs");
+await import("./course-geometry-smoke.mjs");
 await import("./camera-orientation-smoke.mjs");
 await import("./camera-lifecycle-smoke.mjs");
 await import("./map-display-mode-smoke.mjs");

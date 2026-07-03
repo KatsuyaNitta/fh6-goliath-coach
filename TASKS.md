@@ -47,12 +47,13 @@
 - [x] S1-S6 selection is implemented.
 - [x] Selected section uses its original color, thicker line, and halo.
 - [x] Non-selected sections are gray and dimmed.
-- [x] Selected section boundary markers are emphasized.
+- [x] P1-P5 remain internal section-boundary data; normal 3D course markers are hidden.
 - [x] Normal viewer automatically shows the reference path before a lap is loaded and the actual trace after a valid lap is loaded.
 - [x] Overview map mode frames the full course, renders S1-S6 with equal emphasis, uses slow 3D automatic rotation, and stops rotation on manual camera interaction.
 - [x] Section Focus uses deterministic section-specific 3D camera framing and mode-aware Reset camera.
 - [x] Japanese UI Phase 1 is implemented with centralized UI text, Japanese-first labels, intentional English telemetry labels, and display-only unit labels `PS`, `NM`, `KG`, `KGF/MM`, and `cm`.
 - [x] Tune editor hides artificial `game`/`deg` suffixes for unitless FH6 game values, starts drivetrain/differential as explicit `null` in v2 JSON, can initialize blank vehicle name/year from a successfully loaded Local Session, and resets or warns when the loaded vehicle identity changes.
+- [x] Course geometry v1 artifact is generated from the 1 m reference path with tangent, heading, gradient, signed curvature, estimated radius, left/right/straight, uphill/downhill/flat, fitting settings, quality flags, and Viewer Gradient/Curvature color modes with display-only readability thresholds.
 
 ## Milestone B1
 
@@ -72,7 +73,7 @@
 - [x] Actual driven-path overlay.
 - [x] Reference/Actual visibility toggles replaced by automatic reference-fallback / loaded-actual rendering.
 - [x] Total lap time and selected-section time display.
-- [x] Actual P1-P5 marker display.
+- [x] Actual P1-P5 marker data is parsed for internal use; normal 3D marker display is hidden.
 - [x] Selected actual-lap segment highlighting.
 - [x] Sanitized fixtures and end-to-end tests.
 - [x] Restart-aware lap extraction regression tests.
@@ -171,21 +172,26 @@
 - [x] Parser loads the reference path.
 - [x] Every reference point receives one section ID.
 - [x] Start and finish are valid.
-- [x] P1–P5 render at the correct distances.
+- [x] P1–P5 boundary definitions remain at the correct distances.
 
 ---
 
 # 3. Course Geometry Enrichment — P1
 
-- [ ] Calculate tangent/direction vector.
-- [ ] Calculate local gradient.
-- [ ] Calculate local curvature.
-- [ ] Classify left/right turns.
-- [ ] Classify uphill/downhill/flat.
-- [ ] Add smoothing controls.
-- [ ] Detect discontinuities.
-- [ ] Add data-quality flags.
-- [ ] Document that the reference path is not a verified centerline.
+- [x] Calculate tangent/direction vector.
+- [x] Calculate heading.
+- [x] Calculate local gradient.
+- [x] Calculate signed local curvature.
+- [x] Calculate estimated radius.
+- [x] Classify left/right/straight.
+- [x] Classify uphill/downhill/flat.
+- [x] Add fitting settings for primary and stability windows.
+- [x] Detect distance gaps and source-coordinate discontinuities.
+- [x] Add data-quality flags.
+- [x] Document that the reference path is not a verified centerline.
+- [x] Add Viewer Gradient color mode.
+- [x] Add Viewer Curvature color mode.
+- [x] Add display-only neutral/unavailable colors and strong-value emphasis for Gradient/Curvature modes.
 - [ ] Add optional display-only constant-width ribbon.
 - [ ] Label ribbon width as approximate.
 
@@ -210,7 +216,7 @@
 - [x] Normalize coordinates around start.
 - [x] Apply confirmed render-coordinate transform.
 - [x] Color S1-S6 separately.
-- [x] Render P1-P5.
+- [x] Hide P1-P5 from the normal 3D course view while preserving internal boundary data.
 - [x] Render start/finish.
 - [x] Add OrbitControls.
 - [x] Implement world-Y turntable camera controls.
@@ -226,7 +232,7 @@
 - [x] Highlight selected section.
 - [x] Selected section keeps original color with thicker line and halo.
 - [x] Non-selected sections are gray and dimmed.
-- [x] Selected section boundary markers are emphasized.
+- [x] Section boundaries are communicated through S1-S6 color segmentation and Section Focus.
 - [x] Active course source uses consistent Overview and Section Focus emphasis.
 - [x] Overview map mode: full Goliath course fitted in view; S1-S6 all rendered with equal full emphasis; no single selected section visually dominates; slow automatic rotation; manual interaction stops automatic rotation; Section Focus remains a separate non-rotating analysis mode.
 - [x] Section Focus camera fitting: fit selected section in view; selected section emphasized; non-selected sections reduced; no automatic rotation; chart hover does not move camera; same-section chart pin preserves manual camera composition.
@@ -240,7 +246,7 @@
 - [x] Entire course renders smoothly.
 - [x] User can rotate, zoom, and pan.
 - [x] Six sections are visually distinct.
-- [x] Five markers are visible.
+- [x] START and FINISH remain visible; P1-P5 are hidden from the normal 3D course view.
 - [x] Elevation scale changes display only.
 - [x] No invented geometry is presented as factual.
 
@@ -304,7 +310,7 @@
 - [x] Render actual driven-path overlay.
 - [x] Replace Reference/Actual visibility toggles with automatic active course source selection.
 - [x] Display total lap time and selected-section time.
-- [x] Display actual P1-P5 markers.
+- [x] Preserve actual P1-P5 marker data without rendering normal 3D P markers.
 - [x] Highlight selected actual-lap segment.
 - [x] Extract explainable rewind-derived practice-focus candidates without a composite score.
 
@@ -368,7 +374,7 @@
 - [ ] Individual tire slip.
 - [ ] Suspension travel.
 - [ ] Tire temperatures where available.
-- [x] Synchronized chart cursor.
+- [x] Synchronized chart cursor with a fixed-size screen-space course HUD.
 - [x] Section background bands.
 - [x] P1-P5 marker lines.
 
@@ -633,7 +639,7 @@ The MVP is complete when:
 
 - [x] The browser renders the full 3D Goliath reference path.
 - [x] S1-S6 are color-coded and selectable.
-- [x] P1-P5 and start/finish are visible.
+- [x] START and FINISH are visible; P1-P5 remain internal boundary data and chart guides.
 - [x] Elevation scale is adjustable.
 - [x] Telemetry import and normalization are implemented.
 - [x] A completed lap can be projected to the reference path.

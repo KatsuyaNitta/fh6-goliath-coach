@@ -1,8 +1,8 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Grid, Html, Line, OrbitControls, OrthographicCamera, PerspectiveCamera } from "@react-three/drei";
-import { useEffect, useMemo, useRef, type ElementRef } from "react";
+import { useEffect, useMemo, useRef, type ElementRef, type RefObject } from "react";
 import * as THREE from "three";
-import type { BoundaryMarker, ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
+import type { ReferencePayload, ReferencePointTuple, SectionId } from "../lib/reference";
 import { POINT, SECTION_COLORS, nearestPointByDistance, pointSectionId } from "../lib/reference";
 import {
   referencePointsToOverviewTarget,
@@ -15,11 +15,19 @@ import { OVERVIEW_AUTO_ROTATE_SPEED, type MapDisplayMode } from "../lib/mapDispl
 import { displayCoordinatesToRenderVector, getRelativeHeightM } from "../lib/renderTransform";
 import { getSectionFocusCameraPose } from "../lib/sectionFocusCamera";
 import { activeCourseRenderSource, renderableLapPoints } from "../lib/courseRenderSource";
+import type { CourseColorMode, CourseGeometryPayload } from "../lib/courseGeometry";
+import {
+  GEOMETRY_BASE_COLOR,
+  actualGeometryDisplaySample,
+  geometryRunKey,
+  referenceGeometryDisplaySample,
+  type GeometryDisplayBand,
+  type GeometryDisplaySample,
+} from "../lib/courseColorMode";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 import { UI_TEXT } from "../lib/uiText";
 
 const MUTED_SECTION_COLOR = "#343b44";
-const MUTED_MARKER_COLOR = "#7b8490";
 const NON_SELECTED_OPACITY = 0.26;
 const OVERVIEW_LINE_OPACITY = 1;
 const OVERVIEW_REFERENCE_WIDTH = 5;
@@ -29,6 +37,10 @@ const SELECTED_ACTUAL_WIDTH = 11;
 const REFERENCE_HALO_WIDTH = 17;
 const ACTUAL_HALO_WIDTH = 19;
 const MUTED_LINE_WIDTH = 2;
+const GEOMETRY_BASE_OPACITY = 0.84;
+const GEOMETRY_HALO_OPACITY = 0.18;
+const TELEMETRY_CURSOR_EDGE_INSET_PX = 8;
+const TELEMETRY_CURSOR_BADGE_GAP_PX = 28;
 const BASE_PLANE_MARGIN = 1800;
 const GUIDE_DEDUP_DISTANCE_M = 1;
 
@@ -36,6 +48,18 @@ type ViewMode = "2d" | "3d";
 interface SectionFocusRequest {
   sectionId: SectionId;
   requestId: number;
+}
+
+interface GeometryRenderPoint {
+  position: THREE.Vector3;
+  sample: GeometryDisplaySample;
+}
+
+interface GeometryRenderRun {
+  band: GeometryDisplayBand;
+  colors: THREE.Color[];
+  key: string;
+  points: THREE.Vector3[];
 }
 
 interface CourseSceneProps {
@@ -47,6 +71,8 @@ interface CourseSceneProps {
   overviewAutoRotate: boolean;
   sectionFocusRequest?: SectionFocusRequest | null;
   projectedLap?: ProjectedLapPayload | null;
+  courseGeometry: CourseGeometryPayload | null;
+  courseColorMode: CourseColorMode;
   showElevationContext: boolean;
   showRewinds: boolean;
   selectedRewindClusterId: string;
@@ -64,6 +90,8 @@ export function CourseScene({
   overviewAutoRotate,
   sectionFocusRequest,
   projectedLap,
+  courseGeometry,
+  courseColorMode,
   showElevationContext,
   showRewinds,
   selectedRewindClusterId,
@@ -71,6 +99,7 @@ export function CourseScene({
   onManualCameraInteraction,
   activeTelemetryPoint,
 }: CourseSceneProps) {
+  const telemetryCursorHudRef = useRef<HTMLDivElement | null>(null);
   const baselineDisplayY = reference.coordinate_system.relative_elevation.baseline_display_y;
   const bounds = useMemo(
     () => referencePointsToRenderBounds(reference.points, elevationScale, baselineDisplayY),
@@ -83,6 +112,10 @@ export function CourseScene({
   const cameraPosition = useMemo(
     () => (viewMode === "2d" ? getTopDownCameraPosition(bounds) : getCanonical3DAnalysisCameraPosition(bounds, overviewTarget)),
     [bounds, overviewTarget, viewMode],
+  );
+  const activeTelemetryPosition = useMemo(
+    () => activeTelemetryPoint ? projectedLapPointToRenderVector(activeTelemetryPoint, elevationScale, baselineDisplayY) : null,
+    [activeTelemetryPoint, baselineDisplayY, elevationScale],
   );
 
   return (
@@ -110,6 +143,8 @@ export function CourseScene({
       <CourseLines
         reference={reference}
         projectedLap={projectedLap}
+        courseGeometry={courseGeometry}
+        courseColorMode={courseColorMode}
         elevationScale={elevationScale}
         baselineDisplayY={baselineDisplayY}
         selectedSectionId={selectedSectionId}
@@ -117,8 +152,8 @@ export function CourseScene({
         showRewinds={showRewinds}
         selectedRewindClusterId={selectedRewindClusterId}
         onSelectRewindCluster={onSelectRewindCluster}
-        activeTelemetryPoint={activeTelemetryPoint}
       />
+      <TelemetryCursorProjector hudRef={telemetryCursorHudRef} position={activeTelemetryPosition} />
       <SceneControls
         bounds={bounds}
         cameraPosition={cameraPosition}
@@ -132,8 +167,73 @@ export function CourseScene({
         onManualCameraInteraction={onManualCameraInteraction}
       />
       </Canvas>
+      <div
+        aria-hidden="true"
+        className="telemetry-cursor-hud"
+        data-visible={activeTelemetryPoint ? "true" : "false"}
+        ref={telemetryCursorHudRef}
+      >
+        <div className="telemetry-cursor-badge">{formatTelemetryCursorSpeed(activeTelemetryPoint?.speedKmh)}</div>
+        <div className="telemetry-cursor-leader" />
+        <div className="telemetry-cursor-diamond" />
+      </div>
     </div>
   );
+}
+
+function TelemetryCursorProjector({
+  hudRef,
+  position,
+}: {
+  hudRef: RefObject<HTMLDivElement | null>;
+  position: THREE.Vector3 | null;
+}) {
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const projectedRef = useRef(new THREE.Vector3());
+
+  useFrame(() => {
+    const hud = hudRef.current;
+    if (!hud || !position) {
+      if (hud) {
+        hud.dataset.visible = "false";
+      }
+      return;
+    }
+
+    const projected = projectedRef.current.copy(position).project(camera);
+    const x = (projected.x * 0.5 + 0.5) * size.width;
+    const y = (-projected.y * 0.5 + 0.5) * size.height;
+    const isVisible =
+      projected.z >= -1 &&
+      projected.z <= 1 &&
+      x >= 0 &&
+      x <= size.width &&
+      y >= 0 &&
+      y <= size.height;
+
+    if (!isVisible) {
+      hud.dataset.visible = "false";
+      return;
+    }
+
+    const badge = hud.querySelector<HTMLElement>(".telemetry-cursor-badge");
+    const badgeWidth = badge?.offsetWidth ?? 86;
+    const badgeHeight = badge?.offsetHeight ?? 30;
+    const badgeCenterX = Math.min(
+      Math.max(x, TELEMETRY_CURSOR_EDGE_INSET_PX + badgeWidth / 2),
+      Math.max(TELEMETRY_CURSOR_EDGE_INSET_PX + badgeWidth / 2, size.width - TELEMETRY_CURSOR_EDGE_INSET_PX - badgeWidth / 2),
+    );
+    const hasRoomAbove = y >= badgeHeight + TELEMETRY_CURSOR_BADGE_GAP_PX + TELEMETRY_CURSOR_EDGE_INSET_PX;
+
+    hud.style.setProperty("--cursor-x", `${x}px`);
+    hud.style.setProperty("--cursor-y", `${y}px`);
+    hud.style.setProperty("--badge-offset-x", `${badgeCenterX - x}px`);
+    hud.dataset.placement = hasRoomAbove ? "above" : "below";
+    hud.dataset.visible = "true";
+  });
+
+  return null;
 }
 
 function SceneCamera({
@@ -382,10 +482,6 @@ function buildElevationGuides(
   const metadata = reference.coordinate_system.relative_elevation;
   const candidates: Array<{ label: string; point: ReferencePointTuple | undefined }> = [
     { label: "START", point: reference.points[0] },
-    ...reference.markers.map((marker) => ({
-      label: marker.label,
-      point: nearestPointByDistance(reference.points, marker.course_distance_m),
-    })),
     { label: "FINISH", point: reference.points[reference.points.length - 1] },
     { label: "MIN", point: nearestPointByDistance(reference.points, metadata.minimum_course_distance_m) },
     { label: "MAX", point: nearestPointByDistance(reference.points, metadata.maximum_course_distance_m) },
@@ -425,6 +521,8 @@ function buildElevationGuides(
 function CourseLines({
   reference,
   projectedLap,
+  courseGeometry,
+  courseColorMode,
   elevationScale,
   baselineDisplayY,
   selectedSectionId,
@@ -432,10 +530,11 @@ function CourseLines({
   showRewinds,
   selectedRewindClusterId,
   onSelectRewindCluster,
-  activeTelemetryPoint,
 }: {
   reference: ReferencePayload;
   projectedLap?: ProjectedLapPayload | null;
+  courseGeometry: CourseGeometryPayload | null;
+  courseColorMode: CourseColorMode;
   elevationScale: number;
   baselineDisplayY: number;
   selectedSectionId: SectionId;
@@ -443,14 +542,13 @@ function CourseLines({
   showRewinds: boolean;
   selectedRewindClusterId: string;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
-  activeTelemetryPoint?: ProjectedLapPoint | null;
 }) {
   const sectionPoints = useMemo(() => {
-    const grouped = new Map<SectionId, ReferencePointTuple[]>();
-    for (const point of reference.points) {
+    const grouped = new Map<SectionId, Array<{ point: ReferencePointTuple; index: number }>>();
+    for (const [index, point] of reference.points.entries()) {
       const id = pointSectionId(reference, point);
       const points = grouped.get(id) ?? [];
-      points.push(point);
+      points.push({ point, index });
       grouped.set(id, points);
     }
     return grouped;
@@ -468,15 +566,6 @@ function CourseLines({
   const renderSource = activeCourseRenderSource(projectedLap);
   const showReferenceCourse = renderSource === "reference-fallback";
   const showActualCourse = renderSource === "loaded-actual" && Boolean(projectedLap);
-
-  const markerPoints = useMemo(() => {
-    return reference.markers
-      .map((marker) => ({
-        marker,
-        point: nearestPointByDistance(reference.points, marker.course_distance_m),
-      }))
-      .filter((item): item is typeof item & { point: ReferencePointTuple } => Boolean(item.point));
-  }, [reference.markers, reference.points]);
 
   const startPoint = reference.points[0];
   const finishPoint = reference.points[reference.points.length - 1];
@@ -497,9 +586,22 @@ function CourseLines({
     <group>
       {showReferenceCourse ? reference.sections.flatMap((section) => {
         const points = sectionPoints.get(section.id) ?? [];
-        const renderedPoints = points.map((point) => referencePointToRenderVector(point, elevationScale, baselineDisplayY));
+        const renderedPoints = points.map(({ point }) => referencePointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
         const isOverview = mapDisplayMode === "overview";
+        const usesGeometryColors = courseColorMode !== "section" && (isOverview || isSelected);
+        if (usesGeometryColors) {
+          const geometryItems = points.map(({ index }, pointIndex) => ({
+            position: renderedPoints[pointIndex],
+            sample: referenceGeometryDisplaySample(courseColorMode, courseGeometry, index, section.id),
+          }));
+          return renderGeometryRouteLines({
+            baseWidth: isOverview ? OVERVIEW_REFERENCE_WIDTH : SELECTED_REFERENCE_WIDTH,
+            keyPrefix: `reference-${section.id}`,
+            opacity: OVERVIEW_LINE_OPACITY,
+            points: geometryItems,
+          });
+        }
         const mainLine = (
           <Line
             key={section.id}
@@ -517,7 +619,7 @@ function CourseLines({
           <Line
             key={`${section.id}-halo`}
             points={renderedPoints}
-            color={SECTION_COLORS[section.id]}
+            color={courseColorMode === "section" ? SECTION_COLORS[section.id] : "#d6ffcc"}
             lineWidth={REFERENCE_HALO_WIDTH}
             transparent
             opacity={0.22}
@@ -533,6 +635,19 @@ function CourseLines({
         const renderedPoints = points.map((point) => projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
         const isOverview = mapDisplayMode === "overview";
+        const usesGeometryColors = courseColorMode !== "section" && (isOverview || isSelected);
+        if (usesGeometryColors) {
+          const geometryItems = points.map((point, pointIndex) => ({
+            position: renderedPoints[pointIndex],
+            sample: actualGeometryDisplaySample(courseColorMode, courseGeometry, point.courseDistanceM, section.id),
+          }));
+          return renderGeometryRouteLines({
+            baseWidth: isOverview ? OVERVIEW_ACTUAL_WIDTH : SELECTED_ACTUAL_WIDTH,
+            keyPrefix: `actual-${section.id}`,
+            opacity: OVERVIEW_LINE_OPACITY,
+            points: geometryItems,
+          });
+        }
         const mainLine = (
           <Line
             key={`actual-${section.id}`}
@@ -550,49 +665,13 @@ function CourseLines({
           <Line
             key={`actual-${section.id}-halo`}
             points={renderedPoints}
-            color={SECTION_COLORS[section.id]}
+            color={courseColorMode === "section" ? SECTION_COLORS[section.id] : "#d6ffcc"}
             lineWidth={ACTUAL_HALO_WIDTH}
             transparent
             opacity={0.18}
           />,
           mainLine,
         ];
-      }) : null}
-      {showReferenceCourse ? markerPoints.map(({ marker, point }) => {
-        const isBoundary = mapDisplayMode === "overview" ? true : markerTouchesSection(marker, selectedSectionId);
-        return (
-          <Marker
-            color={isBoundary ? "#ffffff" : MUTED_MARKER_COLOR}
-            key={marker.id}
-            label={marker.label}
-            point={point}
-            elevationScale={elevationScale}
-            baselineDisplayY={baselineDisplayY}
-            labelDimmed={!isBoundary}
-            opacity={isBoundary ? 1 : 0.38}
-            scale={isBoundary ? 1.12 : 0.78}
-          />
-        );
-      }) : null}
-      {showActualCourse && projectedLap ? markerPoints.map(({ marker, point: fallbackPoint }) => {
-        const actualPoint = actualMarkersById.get(marker.id);
-        const isBoundary = mapDisplayMode === "overview"
-          ? true
-          : markerTouchesSection(marker, selectedSectionId);
-        return (
-          <Marker
-            color={isBoundary ? "#f8fafc" : MUTED_MARKER_COLOR}
-            key={`actual-marker-${marker.id}`}
-            label={marker.label}
-            point={actualPoint ? undefined : fallbackPoint}
-            position={actualPoint ? projectedLapPointToRenderVector(actualPoint, elevationScale, baselineDisplayY) : undefined}
-            elevationScale={elevationScale}
-            baselineDisplayY={baselineDisplayY}
-            labelDimmed={!isBoundary}
-            opacity={isBoundary ? 1 : 0.38}
-            scale={isBoundary ? 1.12 : 0.78}
-          />
-        );
       }) : null}
       {showRewinds && projectedLap ? projectedLap.rewindClusters.map((cluster) => (
         <RewindClusterMarker
@@ -640,32 +719,152 @@ function CourseLines({
   );
 }
 
-function TelemetryCursorMarker({
-  baselineDisplayY,
-  elevationScale,
-  point,
+function renderGeometryRouteLines({
+  baseWidth,
+  keyPrefix,
+  opacity,
+  points,
 }: {
-  baselineDisplayY: number;
-  elevationScale: number;
-  point: ProjectedLapPoint;
+  baseWidth: number;
+  keyPrefix: string;
+  opacity: number;
+  points: GeometryRenderPoint[];
 }) {
-  const position = projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY);
-  return (
-    <group position={position}>
-      <mesh>
-        <sphereGeometry args={[155, 24, 24]} />
-        <meshStandardMaterial color="#ffffff" emissive="#22d3ee" emissiveIntensity={0.8} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[230, 18, 12, 36]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.78} />
-      </mesh>
-      <Html distanceFactor={11000} position={[0, 430, 0]} center>
-        <span className="scene-label telemetry-cursor-label">{(point.courseDistanceM / 1000).toFixed(3)} km</span>
-      </Html>
-    </group>
-  );
+  if (points.length < 2) {
+    return [];
+  }
+  const runs = buildGeometryRenderRuns(points);
+  const allPoints = points.map((point) => point.position);
+  const lines = [
+    <Line
+      key={`${keyPrefix}-geometry-base`}
+      points={allPoints}
+      color={GEOMETRY_BASE_COLOR}
+      lineWidth={geometryBaseWidth(baseWidth)}
+      transparent
+      opacity={GEOMETRY_BASE_OPACITY * opacity}
+    />,
+  ];
+
+  for (const [runIndex, run] of runs.entries()) {
+    if (run.points.length < 2) {
+      continue;
+    }
+    if (run.band === "strong") {
+      lines.push(
+        <Line
+          key={`${keyPrefix}-geometry-halo-${runIndex}-${run.key}`}
+          points={run.points}
+          color="#f8fafc"
+          vertexColors={run.colors}
+          lineWidth={geometryHaloWidth(baseWidth)}
+          transparent
+          opacity={GEOMETRY_HALO_OPACITY * opacity}
+        />,
+      );
+    }
+    lines.push(
+      <Line
+        key={`${keyPrefix}-geometry-overlay-${runIndex}-${run.key}`}
+        points={run.points}
+        color="#ffffff"
+        vertexColors={run.colors}
+        lineWidth={geometryOverlayWidth(baseWidth, run.band)}
+        transparent
+        opacity={opacity}
+      />,
+    );
+  }
+  return lines;
 }
+
+function buildGeometryRenderRuns(points: GeometryRenderPoint[]): GeometryRenderRun[] {
+  const runs: GeometryRenderRun[] = [];
+  let current: GeometryRenderRun | null = null;
+  let previous: GeometryRenderPoint | null = null;
+
+  for (const point of points) {
+    const key = geometryRunKey(point.sample);
+    if (!current) {
+      current = startGeometryRun(key, point);
+    } else if (current.key === key) {
+      appendGeometryRunPoint(current, point);
+    } else {
+      pushGeometryRenderRun(runs, current);
+      current = previous ? startGeometryRunFromBoundary(key, previous.position, point.sample) : startGeometryRun(key, point);
+      if (previous) {
+        appendGeometryRunPoint(current, point);
+      }
+    }
+    previous = point;
+  }
+  if (current) {
+    pushGeometryRenderRun(runs, current);
+  }
+  return runs;
+}
+
+function startGeometryRun(key: string, point: GeometryRenderPoint): GeometryRenderRun {
+  return {
+    band: point.sample.band,
+    colors: [point.sample.color],
+    key,
+    points: [point.position],
+  };
+}
+
+function startGeometryRunFromBoundary(
+  key: string,
+  boundaryPosition: THREE.Vector3,
+  sample: GeometryDisplaySample,
+): GeometryRenderRun {
+  return {
+    band: sample.band,
+    colors: [sample.color],
+    key,
+    points: [boundaryPosition],
+  };
+}
+
+function appendGeometryRunPoint(run: GeometryRenderRun, point: GeometryRenderPoint): void {
+  run.points.push(point.position);
+  run.colors.push(point.sample.color);
+}
+
+function pushGeometryRenderRun(runs: GeometryRenderRun[], run: GeometryRenderRun): void {
+  if (run.points.length >= 2) {
+    runs.push(run);
+  }
+}
+
+function geometryBaseWidth(baseWidth: number): number {
+  return baseWidth + 5;
+}
+
+function geometryOverlayWidth(baseWidth: number, band: GeometryDisplayBand): number {
+  if (band === "strong") {
+    return baseWidth + 4;
+  }
+  if (band === "medium") {
+    return baseWidth + 2.5;
+  }
+  if (band === "low") {
+    return baseWidth + 1.5;
+  }
+  return baseWidth + 0.75;
+}
+
+function geometryHaloWidth(baseWidth: number): number {
+  return baseWidth + 10;
+}
+
+function formatTelemetryCursorSpeed(speedKmh: number | undefined): string {
+  if (speedKmh === undefined || !Number.isFinite(speedKmh)) {
+    return UI_TEXT.speedUnavailable;
+  }
+  return `${Math.round(speedKmh)} km/h`;
+}
+
 function RewindClusterMarker({
   baselineDisplayY,
   cluster,
@@ -715,13 +914,6 @@ function rewindClusterColor(cluster: RewindClusterPayload): string {
   }
   return "#94a3b8";
 }
-function markerTouchesSection(
-  marker: BoundaryMarker,
-  selectedSectionId: SectionId,
-): boolean {
-  return marker.from_section_id === selectedSectionId || marker.to_section_id === selectedSectionId;
-}
-
 function Marker({
   color,
   label,

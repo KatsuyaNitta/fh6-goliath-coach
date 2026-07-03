@@ -10,8 +10,15 @@ import type { PracticeFocusReason } from "./lib/practiceFocus";
 import { buildCameraLifecycleKey } from "./lib/cameraLifecycle";
 import { INITIAL_MAP_DISPLAY_MODE, shouldAutoRotateOverview, type MapDisplayMode } from "./lib/mapDisplayMode";
 import { rewindNavigationDecision, sectionForRewindSelection } from "./lib/rewindSelection";
+import {
+  fetchCourseGeometry,
+  sampleGeometryAtDistance,
+  type CourseColorMode,
+  type CourseGeometryPayload,
+} from "./lib/courseGeometry";
+import { courseGeometryLegend } from "./lib/courseColorMode";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
-import { UI_TEXT } from "./lib/uiText";
+import { CHART_TEXT, UI_TEXT } from "./lib/uiText";
 import type { LoadedSessionVehicleMetadata } from "./lib/vehicleAutofill";
 
 type ViewMode = "3d";
@@ -23,6 +30,9 @@ interface SectionFocusRequest {
 export function App() {
   const [reference, setReference] = useState<ReferencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [courseGeometry, setCourseGeometry] = useState<CourseGeometryPayload | null>(null);
+  const [courseGeometryError, setCourseGeometryError] = useState<string | null>(null);
+  const [courseColorMode, setCourseColorMode] = useState<CourseColorMode>("section");
   const [selectedSectionId, setSelectedSectionId] = useState<SectionId>("S1");
   const [elevationScale, setElevationScale] = useState(5);
   const viewMode: ViewMode = "3d";
@@ -52,6 +62,22 @@ export function App() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!reference) {
+      return;
+    }
+    fetchCourseGeometry(reference)
+      .then((geometry) => {
+        setCourseGeometry(geometry);
+        setCourseGeometryError(null);
+      })
+      .catch((caught: unknown) => {
+        setCourseGeometry(null);
+        setCourseGeometryError(caught instanceof Error ? caught.message : UI_TEXT.courseGeometryUnavailable);
+        setCourseColorMode("section");
+      });
+  }, [reference]);
+
   const selectedSection = useMemo<SectionDefinition | undefined>(() => {
     return reference?.sections.find((section) => section.id === selectedSectionId);
   }, [reference, selectedSectionId]);
@@ -70,6 +96,10 @@ export function App() {
   }, [projectedLap, selectedRewindEventId]);
   const selectedRewindDetailPoint = selectedRewindEvent ?? selectedRewindCluster?.points[0];
   const activeTelemetryPoint = hoveredTelemetryPoint ?? pinnedTelemetryPoint;
+  const activeGeometrySample = useMemo(() => {
+    return sampleGeometryAtDistance(courseGeometry, activeTelemetryPoint?.courseDistanceM);
+  }, [activeTelemetryPoint?.courseDistanceM, courseGeometry]);
+  const geometryLegend = useMemo(() => courseGeometryLegend(courseColorMode, courseGeometry), [courseColorMode, courseGeometry]);
   const overviewAutoRotate = shouldAutoRotateOverview({
     viewMode,
     mapDisplayMode,
@@ -200,6 +230,8 @@ export function App() {
               overviewAutoRotate={overviewAutoRotate}
               sectionFocusRequest={sectionFocusRequest}
               projectedLap={projectedLap}
+              courseGeometry={courseGeometry}
+              courseColorMode={courseColorMode}
               showElevationContext={showElevationContext}
               showRewinds={showRewinds && Boolean(projectedLap?.rewindClusters.length)}
               selectedRewindClusterId={selectedRewindClusterId}
@@ -257,6 +289,41 @@ export function App() {
         <button className="command-button" type="button" onClick={resetCamera}>
           {UI_TEXT.resetCamera}
         </button>
+
+        <div className="segmented-group three-up" aria-label={UI_TEXT.courseColorMode}>
+          {(["section", "gradient", "curvature"] as CourseColorMode[]).map((mode) => {
+            const disabled = mode !== "section" && !courseGeometry;
+            return (
+              <button
+                className={courseColorMode === mode ? "active" : ""}
+                aria-pressed={courseColorMode === mode}
+                disabled={disabled}
+                key={mode}
+                type="button"
+                onClick={() => setCourseColorMode(mode)}
+              >
+                {formatCourseColorMode(mode)}
+              </button>
+            );
+          })}
+        </div>
+        {courseGeometryError ? <p className="status-text">{UI_TEXT.courseGeometryUnavailable}</p> : null}
+        {geometryLegend ? (
+          <div className="course-legend" aria-label={UI_TEXT.courseColorMode} title={geometryLegend.helpText}>
+            {geometryLegend.labels.map((label, index) => (
+              <span key={label}>
+                <i style={{ backgroundColor: geometryLegend.colors[index] }} />
+                {label}
+              </span>
+            ))}
+            <span>
+              <i style={{ backgroundColor: geometryLegend.unavailableColor }} />
+              {CHART_TEXT.unavailable}
+            </span>
+            <em>{geometryLegend.note}</em>
+            <small>{geometryLegend.helpText}</small>
+          </div>
+        ) : null}
 
         <SessionBrowserPanel
           loadedSessionId={loadedSessionId}
@@ -363,6 +430,24 @@ export function App() {
                 <dt>{UI_TEXT.visual}</dt>
                 <dd>{elevationScale}x</dd>
               </div>
+            </dl>
+          </section>
+        ) : null}
+
+        {activeGeometrySample ? (
+          <section className="section-detail compact-panel">
+            <h2>{UI_TEXT.courseGeometryReadout}</h2>
+            <dl>
+              <div><dt>{UI_TEXT.distance}</dt><dd>{(activeGeometrySample.courseDistanceM / 1000).toFixed(3)} km</dd></div>
+              <div><dt>{UI_TEXT.speed}</dt><dd>{formatSpeed(activeTelemetryPoint?.speedKmh)}</dd></div>
+              <div><dt>{CHART_TEXT.section}</dt><dd>{activeGeometrySample.sectionId}</dd></div>
+              <div><dt>{UI_TEXT.heading}</dt><dd>{formatNullable(activeGeometrySample.headingDeg, "deg", 1)}</dd></div>
+              <div><dt>{UI_TEXT.gradient}</dt><dd>{formatSignedNullable(activeGeometrySample.gradientPct, "%", 2)}</dd></div>
+              <div><dt>{UI_TEXT.curvature}</dt><dd>{formatSignedNullable(activeGeometrySample.signedCurvature1pm, "1/m", 5)}</dd></div>
+              <div><dt>{UI_TEXT.radius}</dt><dd>{formatNullable(activeGeometrySample.estimatedRadiusM, "m", 0)}</dd></div>
+              <div><dt>{UI_TEXT.turnDirection}</dt><dd>{formatTurnDirection(activeGeometrySample.turnDirection)}</dd></div>
+              <div><dt>{UI_TEXT.slopeDirection}</dt><dd>{formatSlopeDirection(activeGeometrySample.slopeDirection)}</dd></div>
+              <div><dt>{UI_TEXT.quality}</dt><dd>{formatQualityFlags(activeGeometrySample.qualityFlags)}</dd></div>
             </dl>
           </section>
         ) : null}
@@ -541,4 +626,81 @@ function formatDirection(value: string): string {
     return UI_TEXT.unknown;
   }
   return value;
+}
+
+function formatCourseColorMode(mode: CourseColorMode): string {
+  if (mode === "gradient") {
+    return UI_TEXT.courseColorGradient;
+  }
+  if (mode === "curvature") {
+    return UI_TEXT.courseColorCurvature;
+  }
+  return UI_TEXT.courseColorSection;
+}
+
+function formatNullable(value: number | null, unit: string, decimals: number): string {
+  if (value === null || !Number.isFinite(value)) {
+    return CHART_TEXT.unavailable;
+  }
+  return `${value.toFixed(decimals)} ${unit}`;
+}
+
+function formatSpeed(speedKmh: number | undefined): string {
+  if (speedKmh === undefined || !Number.isFinite(speedKmh)) {
+    return CHART_TEXT.unavailable;
+  }
+  return `${Math.round(speedKmh)} km/h`;
+}
+
+function formatSignedNullable(value: number | null, unit: string, decimals: number): string {
+  if (value === null || !Number.isFinite(value)) {
+    return CHART_TEXT.unavailable;
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(decimals)} ${unit}`;
+}
+
+function formatTurnDirection(value: string): string {
+  if (value === "left") {
+    return "左";
+  }
+  if (value === "right") {
+    return "右";
+  }
+  if (value === "straight") {
+    return "直線";
+  }
+  return UI_TEXT.unknown;
+}
+
+function formatSlopeDirection(value: string): string {
+  if (value === "uphill") {
+    return "上り";
+  }
+  if (value === "downhill") {
+    return "下り";
+  }
+  if (value === "flat") {
+    return "平坦";
+  }
+  return UI_TEXT.unknown;
+}
+
+function formatQualityFlags(flags: string[]): string {
+  if (flags.length === 0) {
+    return "OK";
+  }
+  return flags.map(formatQualityFlag).join(" / ");
+}
+
+function formatQualityFlag(flag: string): string {
+  const labels: Record<string, string> = {
+    edge_window: "端部",
+    insufficient_neighbors: "近傍不足",
+    distance_gap: "距離ギャップ",
+    degenerate_tangent: "接線不正",
+    unstable_curvature: "曲率不安定",
+    source_discontinuity: "元データ不連続",
+  };
+  return labels[flag] ?? flag;
 }

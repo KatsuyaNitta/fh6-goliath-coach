@@ -12,7 +12,7 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 
 - Goliath の 1 m 間隔の基準走行パスの 3D 表示（ラップ未読込み時の表示フォールバック）
 - S1-S6 の 6 区間表示
-- P1-P5 の区間境界マーカー
+- P1-P5 の区間境界データ（通常の 3D コースビューでは非表示）
 - Overview モードでの全コース表示、S1-S6 の均等強調、低速 3D 自動回転
 - 手動の回転、ズーム、パンによる Overview 自動回転の停止
 - OS またはブラウザの reduced-motion 設定に応じた自動回転の無効化
@@ -21,6 +21,8 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 - 3D 視点の回転、ズーム、パン
 - 通常UIは 3D 表示に固定
 - 高さ倍率の変更
+- 解析用基準パスから生成したコース形状データ（方位、勾配、符号付き曲率、推定半径、左右/上り下り分類、品質フラグ）
+- Viewer のコース色モード（セクション / 勾配 / 曲率）と、チャート hover/pin に連動するコース形状 readout
 - 実走行テレメトリ CSV とセッション JSON の処理
 - 完走ラップの抽出
 - 5 個の手動ハンドブレーキマーカーの検出
@@ -35,6 +37,16 @@ Section Focus は、選択区間の強調表示と、その区間ごとの決定
 UI は日本語ファーストです。`Speed` / `Throttle` / `Brake` / `Steering`、`2D` / `3D`、`PI`、`FWD` / `RWD` / `AWD` は、ゲーム内表記やテレメトリ文脈との対応を保つため意図的に英語のまま表示します。車両・チューニングの表示単位は `PS`、`NM`、`KG`、`KGF/MM`、`cm` を使用します。この単位表記変更は表示ラベルのみで、数値変換は行わず、`power_ps`、`torque_nm`、`weight_kg`、`springs`、`ride_height` などの保存キーやバックエンド契約も変更しません。言語切り替えや本格的な i18n フレームワークは今後の作業です。
 
 通常ビューでは、Reference / Actual のレイヤー切り替えチェックボックスは表示しません。有効なラップがまだ読込まれていない場合は、分析用の基準パスをコース表示のフォールバックとして描画します。有効なラップを読込んだ後は、実走行トレースを通常の可視コースとして描画し、基準パスは距離、区間、マーカー、投影、カメラ安定化などの内部解析用バックボーンとして保持します。基準パスは理想ラインや公式中心線ではなく、将来の診断用参照オーバーレイは別作業です。
+
+P1-P5 は S1-S6 の内部境界定義として保持しますが、通常の 3D コースビューにはラベルや球体マーカーとして表示しません。区間境界は S1-S6 の色分けと Section Focus で示します。START / FINISH は分析上の意味が異なるため、3D コースビュー上に引き続き表示します。テレメトリチャートの P1-P5 ガイド線は、距離軸の参照として残します。
+
+コース形状データは、記録済みの分析用基準パスから推定した診断補助データです。公式の道路形状、道路中心線、道幅、道路端、理想ラインではありません。各点の `display_x/display_y/display_z` は開始地点からの差分で、バックエンドの形状計算ではレンダー用の `-display_z` 変換は使いません。方位は `0 deg = +display_z`、`90 deg = +display_x`、時計回りを正とし、符号付き曲率は左を正、右を負として保存します。利用できない値は `null` とし、0 として扱いません。
+
+形状生成は `course_distance_m` を中心にした距離窓の二次最小二乗フィットで行います。既定値は `half_window_m = 15.0`、曲率安定性チェック用の `stability_half_window_m = 25.0`、直線判定 `straight_curvature_threshold_1pm = 0.0005`、平坦判定 `flat_gradient_threshold_pct = 0.5` です。品質フラグは `edge_window`、`insufficient_neighbors`、`distance_gap`、`degenerate_tangent`、`unstable_curvature`、`source_discontinuity` です。`insufficient_neighbors`、`distance_gap`、`source_discontinuity`、`degenerate_tangent` は派生値を `null` にし、`unstable_curvature` は曲率、半径、旋回分類だけを無効化します。
+
+生成される artifact は `viewer/public/reference/goliath_course_geometry.json` で、schema は `goliath-course-geometry-v1` です。1 m 基準パスと同じ点数の compact tuple を持ち、主要フィールドは `reference_index`、`course_distance_m`、`section_id`、`tangent_x/tangent_z`、`heading_deg`、`gradient_ratio/gradient_pct/gradient_angle_deg`、`signed_curvature_1pm`、`estimated_radius_m`、`turn_direction`、`slope_direction`、`quality_flags` です。Viewer はこの artifact が欠落または不整合の場合でも起動し、セクション色表示を維持し、勾配/曲率モードだけを利用不可にします。
+
+Viewer のコース色は `Section`、`勾配`、`曲率` を切り替えられます。`Section` は S1-S6 の既存セクション色をそのまま使います。`勾配` と `曲率` は Viewer 表示専用の可読性しきい値を使い、`abs(gradient_pct) < 1.0%` を平坦表示、`abs(signed_curvature_1pm) < 0.0015 1/m` を直線表示として muted gray にします。利用不可または無効な形状値は別の darker blue-gray で表示し、0 として扱いません。強い勾配・曲率ほど色と halo が強くなりますが、この強調は表示専用です。artifact 内の解析値、左右/上り下り分類、品質フラグ、将来のコーナー検出しきい値は変更しません。
 
 チューニングフォームでは、Forza のゲーム内数値として扱うギア比、アライメント、スタビライザー、ダンピングには人工的な `game` や `deg` の単位 suffix を表示しません。新規フォームの駆動方式は `未設定` で始まり、保存JSONでは `vehicle.drivetrain: null` と `tune.differential: null` として明示します。FWD/RWD/AWD を選択した場合だけ、対応するデフ設定欄を表示します。新規保存は `goliath-vehicle-tune-v2` を使用し、既存の `goliath-vehicle-tune-v1` の FWD/RWD/AWD JSON は値を保ったまま読込めます。ローカルセッションを正常に読込んだ場合だけ、空の車両名と年式をセッションの車両表示名から初期入力します。セッションカードを選択しただけでは変更されません。同じ車両の別セッションを読込んだ場合は入力済みのチューニングを保持し、別車両を読込んだ場合は新しい空の v2 ドキュメントへ切り替えます。ただし手入力済みまたはJSONから読込んだ保護対象データがある場合は確認ダイアログを表示し、保持を選んだ場合は車両不一致の警告を出します。車両同一性は `car_ordinal` を優先し、使えない場合は正規化した表示名で比較します。比較不能な場合は破壊的な自動リセットを行いません。駆動方式は未検証のため自動入力せず、PIなど他の車両項目もまだ自動入力しません。
 
@@ -81,7 +93,7 @@ S1-S6 の区間タイム合計はラップタイムと約 `0.044 s` 異なりま
 
 FH6 Goliath Coach is a browser-based telemetry-analysis and reference-path visualization tool for the Goliath course in Forza Horizon 6.
 
-Current capabilities include a 1 m sampled reference path, S1-S6 sections and P1-P5 boundary markers, continuity-constrained telemetry projection, completed-lap extraction, automatic actual-trace course display after a valid lap is loaded, section timing, selected-section emphasis, Overview map mode, Japanese-first UI Phase 1, and vehicle/tune metadata save/load.
+Current capabilities include a 1 m sampled reference path, S1-S6 sections, internal P1-P5 boundary definitions, continuity-constrained telemetry projection, completed-lap extraction, automatic actual-trace course display after a valid lap is loaded, section timing, selected-section emphasis, Overview map mode, Japanese-first UI Phase 1, and vehicle/tune metadata save/load.
 
 The viewer opens in **Overview** mode. Overview frames the full Goliath course, renders S1-S6 with equal emphasis, and slowly auto-rotates in 3D unless `prefers-reduced-motion: reduce` is active. Manual camera interaction stops that rotation. Clicking an explicit S1-S6 section control enters **Section Focus** and applies that section's deterministic canonical camera framing. Selecting a rewind marker, rewind event, or Practice Focus candidate is also an explicit analysis navigation action: it enters Section Focus, applies the canonical pose when coming from Overview or moving to another section, and preserves the user's manual camera composition for same-section rewind navigation. Pinning a telemetry chart point follows the same section-change reframe rule; chart hover and chart range controls remain passive and do not change the map display mode. Reset camera is mode-aware: Overview restores the full-course pose, while Section Focus restores the selected section's canonical pose. Corner Focus remains future work.
 
@@ -90,6 +102,8 @@ The displayed UI is Japanese-first. `Speed`, `Throttle`, `Brake`, `Steering`, `2
 Unitless game values in the tune form no longer show artificial `game` or `deg` suffixes. Fresh tune forms start with drivetrain unset, serialized as `vehicle.drivetrain: null` and `tune.differential: null`; differential controls appear only after choosing FWD, RWD, or AWD. New saves use `goliath-vehicle-tune-v2`, while existing `goliath-vehicle-tune-v1` FWD/RWD/AWD files remain readable without losing values. A successfully loaded Local Session can initialize blank tune vehicle name/year fields from its vehicle display name. Same-vehicle sessions preserve all tune input; different vehicles reset to a fresh tune document unless current user/JSON-owned data requires confirmation. Keeping the current settings leaves a visible vehicle-mismatch warning. Vehicle identity uses `car_ordinal` first and normalized display name as fallback; indeterminate identity never triggers a destructive automatic reset. Drivetrain telemetry interpretation is still unverified and remains manual; PI and other vehicle fields are not auto-populated yet.
 
 The reference path is not official road geometry, not an official road centerline, and not an ideal racing line. It is an internal analytical backbone generated from recorded driving coordinates. Before a valid lap is loaded, the viewer shows it as the fallback course representation. After a valid lap is loaded, the normal visible course becomes the loaded actual driving trace; the reference path remains available internally for course distance, sections, markers, projection, and camera stability. The normal UI no longer exposes Reference / Actual layer checkboxes. A future diagnostic reference overlay is out of scope for the normal viewer.
+
+P1-P5 remain internal section-boundary definitions, but the normal 3D course view no longer renders them as labels or sphere markers. S1-S6 color segmentation and Section Focus communicate section boundaries instead. START and FINISH remain visible. Telemetry charts still draw P1-P5 guide lines on the distance axis.
 
 ## Reference CSV
 
@@ -146,6 +160,14 @@ python -m pip install -e .
 ```powershell
 .\.venv\Scripts\Activate.ps1
 python -m goliath.cli build-reference data\reference\goliath_reference_1m.csv --output viewer\public\reference\goliath_reference.json
+```
+
+コース形状データも生成する場合:
+
+```powershell
+.\.venv\Scripts\python.exe -m goliath.cli build-course-geometry `
+  data\reference\goliath_reference_1m.csv `
+  --output viewer\public\reference\goliath_course_geometry.json
 ```
 
 ## Process a Local Telemetry Session
@@ -325,7 +347,7 @@ Loaded projected laps now show four distance-based Canvas telemetry tracks:
 
 The shared x-axis is `course_distance_m`, displayed in kilometres. Use **Full lap** to inspect the complete lap or **Selected section** to focus on the currently selected S1-S6 section. The charts draw subtle S1-S6 background bands, P1-P5 reference marker lines, and rewind event markers.
 
-Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a lightweight cursor marker on the 3D/2D course. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
+Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a fixed-size screen-space location HUD on the course. The HUD uses the projected route point as its anchor, shows speed in `km/h`, and keeps the same pixel size while zooming; it is not a vehicle model and does not represent heading or travel direction. The accessible detail readout continues to show course distance, section, speed, heading, gradient, curvature, radius, turn direction, slope direction, and quality values separately. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
 
 ## Practice Focus Candidates
 

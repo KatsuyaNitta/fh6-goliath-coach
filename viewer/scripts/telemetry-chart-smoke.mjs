@@ -66,6 +66,15 @@ assert.equal(oldPayload.points[0].brakePct, null);
 assert.equal(oldPayload.points[0].steerNorm, null);
 assert.deepEqual(oldPayload.channelAvailability, { speed: true, throttle: false, brake: false, steering: false });
 
+const markerCsv = [
+  "source_row_index,timestamp_s,lap_time_s,course_distance_m,section_id,projection_error_m,telemetry_display_x,telemetry_display_y,telemetry_display_z,speed_kmh,manual_marker_id,exclude_from_driving_analysis",
+  "1,0,0,0,S1,0,0,0,0,100,START,False",
+  "2,1,1,100,S1,0,1,0,1,120,P1,True",
+  "3,2,2,200,S2,0,2,0,2,80,P2,True",
+].join("\n");
+const markerPayload = telemetryLap.parseProjectedLapCsv(markerCsv, "marker_projected-lap.csv");
+assert.deepEqual(markerPayload.markers.map((point) => point.manualMarkerId), ["START", "P1", "P2"]);
+
 const emptyOptionalCsv = newCsv.replace("55,0,0.25", ",,");
 const emptyPayload = telemetryLap.parseProjectedLapCsv(emptyOptionalCsv, "empty_projected-lap.csv");
 assert.equal(emptyPayload.points[1].throttlePct, null);
@@ -148,6 +157,9 @@ assert.match(panelSource, /showDistanceLabels=\{layout\.showDistanceLabels\}/);
 assert.match(panelSource, /showSectionLabels=\{layout\.showSectionLabels\}/);
 assert.match(panelSource, /showMarkerLabels=\{layout\.showMarkerLabels\}/);
 assert.match(panelSource, /showRewindLabels=\{layout\.showRewindLabels\}/);
+assert.match(panelSource, /markers=\{reference\.markers\}/);
+assert.match(canvasSource, /for \(const marker of markers\)/);
+assert.match(canvasSource, /context\.fillText\(marker\.label/);
 assert.match(canvasSource, /visibleDrawnSamples/s);
 assert.doesNotMatch(canvasSource, /className="telemetry-chart-description"/);
 assert.match(canvasSource, /<small>\{CHART_TEXT\.unavailable\}<\/small>/);
