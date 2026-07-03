@@ -17,13 +17,23 @@ import { getSectionFocusCameraPose } from "../lib/sectionFocusCamera";
 import { activeCourseRenderSource, renderableLapPoints } from "../lib/courseRenderSource";
 import type { CourseColorMode, CourseGeometryPayload } from "../lib/courseGeometry";
 import {
-  GEOMETRY_BASE_COLOR,
-  actualGeometryDisplaySample,
+  actualTelemetryDisplaySample,
   geometryRunKey,
-  referenceGeometryDisplaySample,
   type GeometryDisplayBand,
   type GeometryDisplaySample,
 } from "../lib/courseColorMode";
+import {
+  CARD_HORIZONTAL_GAP_PX,
+  CARD_VERTICAL_GAP_PX,
+  LEADER_MIN_LENGTH_PX,
+  PLACEMENT_HYSTERESIS_PX,
+  ROUTE_CLEARANCE_PX,
+  VIEWPORT_INSET_PX,
+  chooseTelemetryCalloutPlacement,
+  type TelemetryCalloutPlacement,
+  type TelemetryCalloutRoutePoint,
+} from "../lib/telemetryCalloutPlacement";
+import { telemetryChannelValue } from "../lib/telemetryChart";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 import { UI_TEXT } from "../lib/uiText";
 
@@ -37,10 +47,7 @@ const SELECTED_ACTUAL_WIDTH = 11;
 const REFERENCE_HALO_WIDTH = 17;
 const ACTUAL_HALO_WIDTH = 19;
 const MUTED_LINE_WIDTH = 2;
-const GEOMETRY_BASE_OPACITY = 0.84;
-const GEOMETRY_HALO_OPACITY = 0.18;
-const TELEMETRY_CURSOR_EDGE_INSET_PX = 8;
-const TELEMETRY_CURSOR_BADGE_GAP_PX = 28;
+const TELEMETRY_ROUTE_PROJECTION_SAMPLE_LIMIT = 1000;
 const BASE_PLANE_MARGIN = 1800;
 const GUIDE_DEDUP_DISTANCE_M = 1;
 
@@ -117,6 +124,10 @@ export function CourseScene({
     () => activeTelemetryPoint ? projectedLapPointToRenderVector(activeTelemetryPoint, elevationScale, baselineDisplayY) : null,
     [activeTelemetryPoint, baselineDisplayY, elevationScale],
   );
+  const telemetryRouteProjectionSamples = useMemo(
+    () => telemetryRouteProjectionSamplePositions(projectedLap, elevationScale, baselineDisplayY),
+    [baselineDisplayY, elevationScale, projectedLap],
+  );
 
   return (
     <div className="course-canvas-wrap" onPointerDown={onManualCameraInteraction} onWheel={onManualCameraInteraction}>
@@ -153,7 +164,11 @@ export function CourseScene({
         selectedRewindClusterId={selectedRewindClusterId}
         onSelectRewindCluster={onSelectRewindCluster}
       />
-      <TelemetryCursorProjector hudRef={telemetryCursorHudRef} position={activeTelemetryPosition} />
+      <TelemetryCursorProjector
+        hudRef={telemetryCursorHudRef}
+        position={activeTelemetryPosition}
+        routeSamplePositions={telemetryRouteProjectionSamples}
+      />
       <SceneControls
         bounds={bounds}
         cameraPosition={cameraPosition}
@@ -173,7 +188,17 @@ export function CourseScene({
         data-visible={activeTelemetryPoint ? "true" : "false"}
         ref={telemetryCursorHudRef}
       >
-        <div className="telemetry-cursor-badge">{formatTelemetryCursorSpeed(activeTelemetryPoint?.speedKmh)}</div>
+        <div className="telemetry-cursor-callout">
+          <div className="telemetry-cursor-speed">{formatTelemetryCursorSpeed(activeTelemetryPoint?.speedKmh)}</div>
+          <div className="telemetry-cursor-input-row">
+            <span><b>アクセル</b><em className="telemetry-cursor-throttle">{formatTelemetryCursorPercent(telemetryCursorChannelValue(activeTelemetryPoint, "throttle"))}</em></span>
+            <span><b>ブレーキ</b><em className="telemetry-cursor-brake">{formatTelemetryCursorPercent(telemetryCursorChannelValue(activeTelemetryPoint, "brake"))}</em></span>
+          </div>
+          <div className="telemetry-cursor-steering-row">
+            <b>ステアリング</b>
+            <em>{formatTelemetryCursorSteering(telemetryCursorChannelValue(activeTelemetryPoint, "steering"))}</em>
+          </div>
+        </div>
         <div className="telemetry-cursor-leader" />
         <div className="telemetry-cursor-diamond" />
       </div>
@@ -184,13 +209,24 @@ export function CourseScene({
 function TelemetryCursorProjector({
   hudRef,
   position,
+  routeSamplePositions,
 }: {
   hudRef: RefObject<HTMLDivElement | null>;
   position: THREE.Vector3 | null;
+  routeSamplePositions: THREE.Vector3[];
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const projectedRef = useRef(new THREE.Vector3());
+  const placementRef = useRef<TelemetryCalloutPlacement | null>(null);
+  const routeProjectionCacheRef = useRef<TelemetryRouteProjectionCache>({
+    matrixWorld: new THREE.Matrix4(),
+    projectionMatrix: new THREE.Matrix4(),
+    routeSamplePositions: null,
+    screenPoints: [],
+    sizeHeight: 0,
+    sizeWidth: 0,
+  });
 
   useFrame(() => {
     const hud = hudRef.current;
@@ -217,23 +253,87 @@ function TelemetryCursorProjector({
       return;
     }
 
-    const badge = hud.querySelector<HTMLElement>(".telemetry-cursor-badge");
-    const badgeWidth = badge?.offsetWidth ?? 86;
-    const badgeHeight = badge?.offsetHeight ?? 30;
-    const badgeCenterX = Math.min(
-      Math.max(x, TELEMETRY_CURSOR_EDGE_INSET_PX + badgeWidth / 2),
-      Math.max(TELEMETRY_CURSOR_EDGE_INSET_PX + badgeWidth / 2, size.width - TELEMETRY_CURSOR_EDGE_INSET_PX - badgeWidth / 2),
-    );
-    const hasRoomAbove = y >= badgeHeight + TELEMETRY_CURSOR_BADGE_GAP_PX + TELEMETRY_CURSOR_EDGE_INSET_PX;
+    const callout = hud.querySelector<HTMLElement>(".telemetry-cursor-callout");
+    const cardWidth = callout?.offsetWidth ?? 230;
+    const cardHeight = callout?.offsetHeight ?? 92;
+    const routeScreenPoints = projectedRouteScreenPoints(routeProjectionCacheRef.current, routeSamplePositions, camera, size);
+    const placement = chooseTelemetryCalloutPlacement({
+      anchorX: x,
+      anchorY: y,
+      cardWidth,
+      cardHeight,
+      viewportWidth: size.width,
+      viewportHeight: size.height,
+      previousPlacement: placementRef.current,
+      routePoints: routeScreenPoints,
+      insetPx: VIEWPORT_INSET_PX,
+      verticalGapPx: CARD_VERTICAL_GAP_PX,
+      horizontalGapPx: CARD_HORIZONTAL_GAP_PX,
+      hysteresisPx: PLACEMENT_HYSTERESIS_PX,
+      routeClearancePx: ROUTE_CLEARANCE_PX,
+    });
+    placementRef.current = placement.placement;
+    const leaderLength = Math.max(LEADER_MIN_LENGTH_PX, Math.hypot(placement.leaderOffsetX, placement.leaderOffsetY));
+    const leaderAngle = Math.atan2(placement.leaderOffsetY, placement.leaderOffsetX);
 
     hud.style.setProperty("--cursor-x", `${x}px`);
     hud.style.setProperty("--cursor-y", `${y}px`);
-    hud.style.setProperty("--badge-offset-x", `${badgeCenterX - x}px`);
-    hud.dataset.placement = hasRoomAbove ? "above" : "below";
+    hud.style.setProperty("--callout-offset-x", `${placement.offsetX}px`);
+    hud.style.setProperty("--callout-offset-y", `${placement.offsetY}px`);
+    hud.style.setProperty("--leader-length", `${leaderLength}px`);
+    hud.style.setProperty("--leader-angle", `${leaderAngle}rad`);
+    hud.dataset.placement = placement.placement;
     hud.dataset.visible = "true";
   });
 
   return null;
+}
+
+interface TelemetryRouteProjectionCache {
+  matrixWorld: THREE.Matrix4;
+  projectionMatrix: THREE.Matrix4;
+  routeSamplePositions: THREE.Vector3[] | null;
+  screenPoints: TelemetryCalloutRoutePoint[];
+  sizeHeight: number;
+  sizeWidth: number;
+}
+
+function projectedRouteScreenPoints(
+  cache: TelemetryRouteProjectionCache,
+  routeSamplePositions: THREE.Vector3[],
+  camera: THREE.Camera,
+  size: { width: number; height: number },
+): TelemetryCalloutRoutePoint[] {
+  if (
+    cache.routeSamplePositions === routeSamplePositions &&
+    cache.sizeWidth === size.width &&
+    cache.sizeHeight === size.height &&
+    cache.matrixWorld.equals(camera.matrixWorld) &&
+    cache.projectionMatrix.equals(camera.projectionMatrix)
+  ) {
+    return cache.screenPoints;
+  }
+
+  const projected = new THREE.Vector3();
+  const screenPoints: TelemetryCalloutRoutePoint[] = [];
+  for (const position of routeSamplePositions) {
+    projected.copy(position).project(camera);
+    if (projected.z < -1 || projected.z > 1) {
+      continue;
+    }
+    screenPoints.push({
+      x: (projected.x * 0.5 + 0.5) * size.width,
+      y: (-projected.y * 0.5 + 0.5) * size.height,
+    });
+  }
+
+  cache.routeSamplePositions = routeSamplePositions;
+  cache.sizeWidth = size.width;
+  cache.sizeHeight = size.height;
+  cache.matrixWorld.copy(camera.matrixWorld);
+  cache.projectionMatrix.copy(camera.projectionMatrix);
+  cache.screenPoints = screenPoints;
+  return screenPoints;
 }
 
 function SceneCamera({
@@ -589,19 +689,6 @@ function CourseLines({
         const renderedPoints = points.map(({ point }) => referencePointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
         const isOverview = mapDisplayMode === "overview";
-        const usesGeometryColors = courseColorMode !== "section" && (isOverview || isSelected);
-        if (usesGeometryColors) {
-          const geometryItems = points.map(({ index }, pointIndex) => ({
-            position: renderedPoints[pointIndex],
-            sample: referenceGeometryDisplaySample(courseColorMode, courseGeometry, index, section.id),
-          }));
-          return renderGeometryRouteLines({
-            baseWidth: isOverview ? OVERVIEW_REFERENCE_WIDTH : SELECTED_REFERENCE_WIDTH,
-            keyPrefix: `reference-${section.id}`,
-            opacity: OVERVIEW_LINE_OPACITY,
-            points: geometryItems,
-          });
-        }
         const mainLine = (
           <Line
             key={section.id}
@@ -635,16 +722,15 @@ function CourseLines({
         const renderedPoints = points.map((point) => projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY));
         const isSelected = section.id === selectedSectionId;
         const isOverview = mapDisplayMode === "overview";
-        const usesGeometryColors = courseColorMode !== "section" && (isOverview || isSelected);
-        if (usesGeometryColors) {
+        const usesTelemetryColors = courseColorMode !== "section" && (isOverview || isSelected);
+        if (usesTelemetryColors) {
           const geometryItems = points.map((point, pointIndex) => ({
             position: renderedPoints[pointIndex],
-            sample: actualGeometryDisplaySample(courseColorMode, courseGeometry, point.courseDistanceM, section.id),
+            sample: actualTelemetryDisplaySample(courseColorMode, point),
           }));
           return renderGeometryRouteLines({
             baseWidth: isOverview ? OVERVIEW_ACTUAL_WIDTH : SELECTED_ACTUAL_WIDTH,
             keyPrefix: `actual-${section.id}`,
-            opacity: OVERVIEW_LINE_OPACITY,
             points: geometryItems,
           });
         }
@@ -722,56 +808,34 @@ function CourseLines({
 function renderGeometryRouteLines({
   baseWidth,
   keyPrefix,
-  opacity,
   points,
 }: {
   baseWidth: number;
   keyPrefix: string;
-  opacity: number;
   points: GeometryRenderPoint[];
 }) {
   if (points.length < 2) {
     return [];
   }
   const runs = buildGeometryRenderRuns(points);
-  const allPoints = points.map((point) => point.position);
-  const lines = [
-    <Line
-      key={`${keyPrefix}-geometry-base`}
-      points={allPoints}
-      color={GEOMETRY_BASE_COLOR}
-      lineWidth={geometryBaseWidth(baseWidth)}
-      transparent
-      opacity={GEOMETRY_BASE_OPACITY * opacity}
-    />,
-  ];
+  const lines = [];
 
   for (const [runIndex, run] of runs.entries()) {
     if (run.points.length < 2) {
       continue;
     }
-    if (run.band === "strong") {
-      lines.push(
-        <Line
-          key={`${keyPrefix}-geometry-halo-${runIndex}-${run.key}`}
-          points={run.points}
-          color="#f8fafc"
-          vertexColors={run.colors}
-          lineWidth={geometryHaloWidth(baseWidth)}
-          transparent
-          opacity={GEOMETRY_HALO_OPACITY * opacity}
-        />,
-      );
-    }
     lines.push(
       <Line
-        key={`${keyPrefix}-geometry-overlay-${runIndex}-${run.key}`}
+        key={`${keyPrefix}-telemetry-color-${runIndex}-${run.key}`}
         points={run.points}
         color="#ffffff"
         vertexColors={run.colors}
         lineWidth={geometryOverlayWidth(baseWidth, run.band)}
-        transparent
-        opacity={opacity}
+        depthTest
+        depthWrite
+        opacity={1}
+        toneMapped={false}
+        transparent={false}
       />,
     );
   }
@@ -837,10 +901,6 @@ function pushGeometryRenderRun(runs: GeometryRenderRun[], run: GeometryRenderRun
   }
 }
 
-function geometryBaseWidth(baseWidth: number): number {
-  return baseWidth + 5;
-}
-
 function geometryOverlayWidth(baseWidth: number, band: GeometryDisplayBand): number {
   if (band === "strong") {
     return baseWidth + 4;
@@ -854,15 +914,32 @@ function geometryOverlayWidth(baseWidth: number, band: GeometryDisplayBand): num
   return baseWidth + 0.75;
 }
 
-function geometryHaloWidth(baseWidth: number): number {
-  return baseWidth + 10;
-}
-
 function formatTelemetryCursorSpeed(speedKmh: number | undefined): string {
   if (speedKmh === undefined || !Number.isFinite(speedKmh)) {
     return UI_TEXT.speedUnavailable;
   }
   return `${Math.round(speedKmh)} km/h`;
+}
+
+function telemetryCursorChannelValue(
+  point: ProjectedLapPoint | null | undefined,
+  channel: "throttle" | "brake" | "steering",
+): number | null {
+  return point ? telemetryChannelValue(point, channel) : null;
+}
+
+function formatTelemetryCursorPercent(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "N/A";
+  }
+  return `${value.toFixed(0)}%`;
+}
+
+function formatTelemetryCursorSteering(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) {
+    return "N/A";
+  }
+  return value.toFixed(3);
 }
 
 function RewindClusterMarker({
@@ -968,6 +1045,32 @@ function projectedLapPointToRenderVector(
     baselineDisplayY,
   );
   return new THREE.Vector3(renderX, renderY, renderZ);
+}
+
+function telemetryRouteProjectionSamplePositions(
+  projectedLap: ProjectedLapPayload | null | undefined,
+  elevationScale: number,
+  baselineDisplayY: number,
+): THREE.Vector3[] {
+  const points = renderableLapPoints(projectedLap);
+  if (points.length === 0) {
+    return [];
+  }
+  if (points.length <= TELEMETRY_ROUTE_PROJECTION_SAMPLE_LIMIT) {
+    return points.map((point) => projectedLapPointToRenderVector(point, elevationScale, baselineDisplayY));
+  }
+  const positions: THREE.Vector3[] = [];
+  const step = (points.length - 1) / (TELEMETRY_ROUTE_PROJECTION_SAMPLE_LIMIT - 1);
+  let previousIndex = -1;
+  for (let sampleIndex = 0; sampleIndex < TELEMETRY_ROUTE_PROJECTION_SAMPLE_LIMIT; sampleIndex += 1) {
+    const pointIndex = Math.min(points.length - 1, Math.round(sampleIndex * step));
+    if (pointIndex === previousIndex) {
+      continue;
+    }
+    positions.push(projectedLapPointToRenderVector(points[pointIndex], elevationScale, baselineDisplayY));
+    previousIndex = pointIndex;
+  }
+  return positions;
 }
 
 function formatGuideHeight(heightM: number): string {

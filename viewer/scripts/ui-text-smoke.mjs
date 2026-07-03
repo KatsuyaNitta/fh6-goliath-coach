@@ -35,8 +35,11 @@ const {
 } = uiTextModule;
 
 assert.equal(UI_TEXT.courseColorSection, "Section");
-assert.equal(UI_TEXT.courseColorGradient, "勾配");
-assert.equal(UI_TEXT.courseColorCurvature, "曲率");
+assert.equal(UI_TEXT.courseColorSpeed, "速度");
+assert.equal(UI_TEXT.courseColorOperation, "操作");
+assert.equal(UI_TEXT.courseColorRequiresLap, "走行データを読み込むと利用できます。");
+assert.equal(UI_TEXT.operationBraking, "ブレーキ");
+assert.equal(UI_TEXT.operationFullThrottle, "全開");
 assert.equal(UI_TEXT.speed, "速度");
 assert.equal(UI_TEXT.speedUnavailable, "速度不明");
 

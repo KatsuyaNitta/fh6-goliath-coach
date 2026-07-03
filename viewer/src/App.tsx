@@ -16,7 +16,7 @@ import {
   type CourseColorMode,
   type CourseGeometryPayload,
 } from "./lib/courseGeometry";
-import { courseGeometryLegend } from "./lib/courseColorMode";
+import { courseColorLegend } from "./lib/courseColorMode";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 import { CHART_TEXT, UI_TEXT } from "./lib/uiText";
 import type { LoadedSessionVehicleMetadata } from "./lib/vehicleAutofill";
@@ -99,7 +99,29 @@ export function App() {
   const activeGeometrySample = useMemo(() => {
     return sampleGeometryAtDistance(courseGeometry, activeTelemetryPoint?.courseDistanceM);
   }, [activeTelemetryPoint?.courseDistanceM, courseGeometry]);
-  const geometryLegend = useMemo(() => courseGeometryLegend(courseColorMode, courseGeometry), [courseColorMode, courseGeometry]);
+  const speedColorModeAvailable = Boolean(projectedLap?.channelAvailability.speed);
+  const operationColorModeAvailable = Boolean(projectedLap?.channelAvailability.throttle && projectedLap?.channelAvailability.brake);
+  useEffect(() => {
+    if (
+      (courseColorMode === "speed" && !speedColorModeAvailable) ||
+      (courseColorMode === "operation" && !operationColorModeAvailable)
+    ) {
+      setCourseColorMode("section");
+    }
+  }, [courseColorMode, operationColorModeAvailable, speedColorModeAvailable]);
+  const colorLegend = useMemo(() => courseColorLegend(courseColorMode), [courseColorMode]);
+  const colorModeStatusText = useMemo(() => {
+    if (!projectedLap) {
+      return UI_TEXT.courseColorRequiresLap;
+    }
+    if (!speedColorModeAvailable) {
+      return UI_TEXT.courseColorSpeedMissing;
+    }
+    if (!operationColorModeAvailable) {
+      return UI_TEXT.courseColorOperationMissing;
+    }
+    return null;
+  }, [operationColorModeAvailable, projectedLap, speedColorModeAvailable]);
   const overviewAutoRotate = shouldAutoRotateOverview({
     viewMode,
     mapDisplayMode,
@@ -291,14 +313,18 @@ export function App() {
         </button>
 
         <div className="segmented-group three-up" aria-label={UI_TEXT.courseColorMode}>
-          {(["section", "gradient", "curvature"] as CourseColorMode[]).map((mode) => {
-            const disabled = mode !== "section" && !courseGeometry;
+          {(["section", "speed", "operation"] as CourseColorMode[]).map((mode) => {
+            const disabled = isCourseColorModeDisabled(mode, speedColorModeAvailable, operationColorModeAvailable);
+            const disabledReason = disabled
+              ? courseColorModeDisabledReason(mode, projectedLap, speedColorModeAvailable, operationColorModeAvailable)
+              : undefined;
             return (
               <button
                 className={courseColorMode === mode ? "active" : ""}
                 aria-pressed={courseColorMode === mode}
                 disabled={disabled}
                 key={mode}
+                title={disabledReason}
                 type="button"
                 onClick={() => setCourseColorMode(mode)}
               >
@@ -307,21 +333,18 @@ export function App() {
             );
           })}
         </div>
+        {colorModeStatusText ? <p className="status-text">{colorModeStatusText}</p> : null}
         {courseGeometryError ? <p className="status-text">{UI_TEXT.courseGeometryUnavailable}</p> : null}
-        {geometryLegend ? (
-          <div className="course-legend" aria-label={UI_TEXT.courseColorMode} title={geometryLegend.helpText}>
-            {geometryLegend.labels.map((label, index) => (
+        {colorLegend ? (
+          <div className="course-legend" aria-label={UI_TEXT.courseColorMode} title={colorLegend.helpText}>
+            {colorLegend.labels.map((label, index) => (
               <span key={label}>
-                <i style={{ backgroundColor: geometryLegend.colors[index] }} />
+                <i style={{ backgroundColor: colorLegend.colors[index] }} />
                 {label}
               </span>
             ))}
-            <span>
-              <i style={{ backgroundColor: geometryLegend.unavailableColor }} />
-              {CHART_TEXT.unavailable}
-            </span>
-            <em>{geometryLegend.note}</em>
-            <small>{geometryLegend.helpText}</small>
+            <em>{colorLegend.note}</em>
+            <small>{colorLegend.helpText}</small>
           </div>
         ) : null}
 
@@ -629,13 +652,45 @@ function formatDirection(value: string): string {
 }
 
 function formatCourseColorMode(mode: CourseColorMode): string {
-  if (mode === "gradient") {
-    return UI_TEXT.courseColorGradient;
+  if (mode === "speed") {
+    return UI_TEXT.courseColorSpeed;
   }
-  if (mode === "curvature") {
-    return UI_TEXT.courseColorCurvature;
+  if (mode === "operation") {
+    return UI_TEXT.courseColorOperation;
   }
   return UI_TEXT.courseColorSection;
+}
+
+function isCourseColorModeDisabled(
+  mode: CourseColorMode,
+  speedAvailable: boolean,
+  operationAvailable: boolean,
+): boolean {
+  if (mode === "speed") {
+    return !speedAvailable;
+  }
+  if (mode === "operation") {
+    return !operationAvailable;
+  }
+  return false;
+}
+
+function courseColorModeDisabledReason(
+  mode: CourseColorMode,
+  projectedLap: ProjectedLapPayload | null,
+  speedAvailable: boolean,
+  operationAvailable: boolean,
+): string {
+  if (!projectedLap) {
+    return UI_TEXT.courseColorRequiresLap;
+  }
+  if (mode === "speed" && !speedAvailable) {
+    return UI_TEXT.courseColorSpeedMissing;
+  }
+  if (mode === "operation" && !operationAvailable) {
+    return UI_TEXT.courseColorOperationMissing;
+  }
+  return "";
 }
 
 function formatNullable(value: number | null, unit: string, decimals: number): string {

@@ -2,7 +2,8 @@ import type { ReferencePayload, SectionId } from "./reference";
 
 export type TurnDirection = "unknown" | "straight" | "left" | "right";
 export type SlopeDirection = "unknown" | "flat" | "uphill" | "downhill";
-export type CourseColorMode = "section" | "gradient" | "curvature";
+export type CourseColorMode = "section" | "speed" | "operation";
+export type GeometryColorMode = "section" | "gradient" | "curvature";
 
 export const GEOMETRY_POINT = {
   referenceIndex: 0,

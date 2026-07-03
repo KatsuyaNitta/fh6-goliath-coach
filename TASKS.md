@@ -53,7 +53,10 @@
 - [x] Section Focus uses deterministic section-specific 3D camera framing and mode-aware Reset camera.
 - [x] Japanese UI Phase 1 is implemented with centralized UI text, Japanese-first labels, intentional English telemetry labels, and display-only unit labels `PS`, `NM`, `KG`, `KGF/MM`, and `cm`.
 - [x] Tune editor hides artificial `game`/`deg` suffixes for unitless FH6 game values, starts drivetrain/differential as explicit `null` in v2 JSON, can initialize blank vehicle name/year from a successfully loaded Local Session, and resets or warns when the loaded vehicle identity changes.
-- [x] Course geometry v1 artifact is generated from the 1 m reference path with tangent, heading, gradient, signed curvature, estimated radius, left/right/straight, uphill/downhill/flat, fitting settings, quality flags, and Viewer Gradient/Curvature color modes with display-only readability thresholds.
+- [x] Course geometry v1 artifact is generated from the 1 m reference path with tangent, heading, gradient, signed curvature, estimated radius, left/right/straight, uphill/downhill/flat, fitting settings, and quality flags; gradient/curvature remain available in detailed readouts and analysis data.
+- [x] Viewer course color modes are Section, Speed, and Operation; Speed uses fixed km/h stops and Operation classifies throttle/brake state while treating missing values as unavailable.
+- [x] Speed and Operation course colors render as opaque data-colored route lines so the semantic color stays stable across camera angles.
+- [x] Telemetry cursor HUD keeps the diamond on the exact route point while placing the fixed-size card with larger gaps and route-overlap-aware quadrant selection.
 
 ## Milestone B1
 
@@ -374,7 +377,7 @@
 - [ ] Individual tire slip.
 - [ ] Suspension travel.
 - [ ] Tire temperatures where available.
-- [x] Synchronized chart cursor with a fixed-size screen-space course HUD.
+- [x] Synchronized chart cursor with a fixed-size screen-space course HUD showing speed, accelerator, brake, and steering, with route-overlap-aware card placement.
 - [x] Section background bands.
 - [x] P1-P5 marker lines.
 

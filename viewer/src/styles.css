@@ -42,13 +42,16 @@ textarea {
 }
 
 .telemetry-cursor-hud {
-  --badge-offset-x: 0px;
+  --callout-offset-x: 28px;
+  --callout-offset-y: -136px;
   --cursor-x: -9999px;
   --cursor-y: -9999px;
+  --leader-angle: -1rad;
+  --leader-length: 52px;
   position: absolute;
   left: 0;
   top: 0;
-  z-index: 6;
+  z-index: 2147483647;
   width: 0;
   height: 0;
   opacity: 0;
@@ -76,48 +79,107 @@ textarea {
 
 .telemetry-cursor-leader {
   position: absolute;
-  left: -1px;
-  bottom: 13px;
-  width: 2px;
-  height: 11px;
+  left: 0;
+  top: 0;
+  width: var(--leader-length);
+  height: 2px;
   border-radius: 999px;
   background: rgba(34, 211, 238, 0.72);
   box-shadow: 0 0 4px rgba(2, 6, 12, 0.7);
+  transform: rotate(var(--leader-angle));
+  transform-origin: left center;
 }
 
-.telemetry-cursor-badge {
+.telemetry-cursor-callout {
   position: absolute;
-  left: var(--badge-offset-x);
-  bottom: 28px;
-  display: inline-grid;
-  place-items: center;
-  min-width: 88px;
-  height: 30px;
+  left: var(--callout-offset-x);
+  top: var(--callout-offset-y);
+  display: grid;
+  gap: 7px;
+  width: 232px;
+  min-height: 92px;
   border: 1px solid rgba(34, 211, 238, 0.82);
-  border-radius: 7px;
-  padding: 0 12px;
-  background: rgba(10, 16, 22, 0.92);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(10, 16, 22, 0.985);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.38),
     0 0 10px rgba(34, 211, 238, 0.18);
-  color: #e0faff;
-  font-size: 16px;
+  color: #e8f8ff;
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  transform: translateX(-50%);
+  line-height: 1.1;
+}
+
+.telemetry-cursor-speed {
+  min-width: 108px;
+  color: #f8fdff;
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.telemetry-cursor-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.telemetry-cursor-input-row span,
+.telemetry-cursor-steering-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.telemetry-cursor-callout b {
+  overflow: hidden;
+  color: #9fb0c2;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.telemetry-cursor-hud[data-placement="below"] .telemetry-cursor-leader {
-  top: 13px;
-  bottom: auto;
+.telemetry-cursor-callout em {
+  min-width: 40px;
+  color: #f2f7fb;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
 }
 
-.telemetry-cursor-hud[data-placement="below"] .telemetry-cursor-badge {
-  top: 28px;
-  bottom: auto;
+.telemetry-cursor-throttle {
+  color: #86efac;
+}
+
+.telemetry-cursor-brake {
+  color: #fca5a5;
+}
+
+.telemetry-cursor-steering-row em {
+  min-width: 58px;
+}
+
+@media (max-width: 520px) {
+  .telemetry-cursor-callout {
+    width: 206px;
+    min-height: 88px;
+    padding: 9px 10px;
+  }
+
+  .telemetry-cursor-speed {
+    font-size: 20px;
+  }
+
+  .telemetry-cursor-callout b {
+    font-size: 10px;
+  }
+
+  .telemetry-cursor-callout em {
+    font-size: 14px;
+  }
 }
 
 .orientation-indicator {
