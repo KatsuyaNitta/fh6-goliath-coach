@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { ReferencePayload, SectionId } from "../lib/reference";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 import {
@@ -10,18 +9,23 @@ import {
   TELEMETRY_TRACK_LAYOUTS,
   type TelemetryRangeMode,
 } from "../lib/telemetryChart";
+import { getRelativeHeightM } from "../lib/renderTransform";
 import { CHART_TEXT } from "../lib/uiText";
 import { TelemetryChartCanvas } from "./TelemetryChartCanvas";
+
+const CURSOR_ALTITUDE_LABEL = "高度";
 
 interface TelemetryChartsPanelProps {
   reference: ReferencePayload | null;
   projectedLap: ProjectedLapPayload | null;
   selectedSectionId: SectionId;
+  chartRangeMode: TelemetryRangeMode;
   selectedRewindClusterId: string;
   activeTelemetryPoint: ProjectedLapPoint | null;
   pinnedTelemetryPoint: ProjectedLapPoint | null;
   onHoverTelemetryPoint: (point: ProjectedLapPoint | null) => void;
   onPinTelemetryPoint: (point: ProjectedLapPoint | null) => void;
+  onChartRangeModeChange: (mode: TelemetryRangeMode) => void;
   onSelectSection: (sectionId: SectionId) => void;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
 }
@@ -30,16 +34,16 @@ export function TelemetryChartsPanel({
   reference,
   projectedLap,
   selectedSectionId,
+  chartRangeMode,
   selectedRewindClusterId,
   activeTelemetryPoint,
   pinnedTelemetryPoint,
   onHoverTelemetryPoint,
   onPinTelemetryPoint,
+  onChartRangeModeChange,
   onSelectSection,
   onSelectRewindCluster,
 }: TelemetryChartsPanelProps) {
-  const [rangeMode, setRangeMode] = useTelemetryRangeMode();
-
   if (!reference) {
     return null;
   }
@@ -56,7 +60,7 @@ export function TelemetryChartsPanel({
   }
 
   const points = effectiveTelemetryPoints(projectedLap);
-  const range = telemetryRange(projectedLap, rangeMode, selectedSectionId, reference.sections);
+  const range = telemetryRange(projectedLap, chartRangeMode, selectedSectionId, reference.sections);
   const cursorPoint = activeTelemetryPoint;
 
   function pinPoint(point: ProjectedLapPoint | null): void {
@@ -64,10 +68,6 @@ export function TelemetryChartsPanel({
     if (point) {
       onSelectSection(point.sectionId);
     }
-  }
-
-  function setMode(mode: TelemetryRangeMode): void {
-    setRangeMode(mode);
   }
 
   return (
@@ -78,13 +78,18 @@ export function TelemetryChartsPanel({
           <p>{projectedLap.vehicle.displayName} - {projectedLap.sessionId || CHART_TEXT.unknownSession}</p>
         </div>
         <div className="telemetry-chart-controls" aria-label={CHART_TEXT.rangeLabel}>
-          <button className={rangeMode === "full" ? "active" : ""} type="button" onClick={() => setMode("full")}>{CHART_TEXT.fullLap}</button>
-          <button className={rangeMode === "section" ? "active" : ""} type="button" onClick={() => setMode("section")}>{CHART_TEXT.selectedSection}</button>
+          <button className={chartRangeMode === "full" ? "active" : ""} type="button" onClick={() => onChartRangeModeChange("full")}>{CHART_TEXT.fullLap}</button>
+          <button className={chartRangeMode === "section" ? "active" : ""} type="button" onClick={() => onChartRangeModeChange("section")}>{CHART_TEXT.selectedSection}</button>
           <button disabled={!pinnedTelemetryPoint} type="button" onClick={() => onPinTelemetryPoint(null)}>{CHART_TEXT.clearCursor}</button>
         </div>
       </div>
       <div className="telemetry-cursor-readout" aria-live="polite">
-        {cursorPoint ? <CursorValues point={cursorPoint} /> : <span>{CHART_TEXT.cursorHelp}</span>}
+        {cursorPoint ? (
+          <CursorValues
+            baselineDisplayY={reference.coordinate_system.relative_elevation.baseline_display_y}
+            point={cursorPoint}
+          />
+        ) : <span>{CHART_TEXT.cursorHelp}</span>}
       </div>
       <div className="telemetry-chart-stack">
         {TELEMETRY_CHANNELS.map((channel) => {
@@ -121,11 +126,12 @@ export function TelemetryChartsPanel({
   );
 }
 
-function CursorValues({ point }: { point: ProjectedLapPoint }) {
+function CursorValues({ baselineDisplayY, point }: { baselineDisplayY: number; point: ProjectedLapPoint }) {
   return (
     <dl className="telemetry-cursor-values">
       <div><dt>{CHART_TEXT.distance}</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
       <div><dt>{CHART_TEXT.section}</dt><dd>{point.sectionId}</dd></div>
+      <div><dt>{CURSOR_ALTITUDE_LABEL}</dt><dd>{formatAltitude(point.displayY, baselineDisplayY)}</dd></div>
       <div><dt>{CHART_TEXT.lapTime}</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>
       <div><dt>Speed</dt><dd>{point.speedKmh.toFixed(1)} km/h</dd></div>
       <div><dt>Throttle</dt><dd>{formatNullable(telemetryChannelValue(point, "throttle"), "%")}</dd></div>
@@ -135,8 +141,11 @@ function CursorValues({ point }: { point: ProjectedLapPoint }) {
   );
 }
 
-function useTelemetryRangeMode(): [TelemetryRangeMode, (mode: TelemetryRangeMode) => void] {
-  return useState<TelemetryRangeMode>("full");
+function formatAltitude(displayY: number, baselineDisplayY: number): string {
+  if (!Number.isFinite(displayY) || !Number.isFinite(baselineDisplayY)) {
+    return "N/A";
+  }
+  return `${Math.round(getRelativeHeightM(displayY, baselineDisplayY))} m`;
 }
 
 function formatNullable(value: number | null, unit: string): string {

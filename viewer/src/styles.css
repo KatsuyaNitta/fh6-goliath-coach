@@ -15,6 +15,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
@@ -26,14 +27,124 @@ textarea {
 
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  min-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  background: #101318;
+}
+
+.app-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid #2b323b;
+  padding: 12px 16px;
+  background: #11161d;
+}
+
+.loaded-session-status {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: #aeb8c3;
+  font-size: 12px;
+  text-align: right;
+}
+
+.loaded-session-status b,
+.loaded-session-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loaded-session-status b {
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.desktop-workspace {
+  display: grid;
+  grid-template-columns: 320px minmax(760px, 1fr) 352px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-pane,
+.observation-workspace {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.workspace-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+  background: #171b21;
+}
+
+.input-pane {
+  border-right: 1px solid #2b323b;
+}
+
+.interpretation-pane {
+  border-left: 1px solid #2b323b;
+}
+
+.observation-workspace {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  background: #101318;
 }
 
 .viewer-surface {
   position: relative;
-  min-height: 100vh;
+  min-height: 520px;
   background: #101318;
+}
+
+.map-chart-splitter {
+  display: grid;
+  place-items: center;
+  height: 14px;
+  border-top: 1px solid #26303b;
+  border-bottom: 1px solid #26303b;
+  background: #11161d;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.map-chart-splitter span {
+  width: 54px;
+  height: 3px;
+  border-radius: 999px;
+  background: #465362;
+}
+
+.map-chart-splitter:hover,
+.map-chart-splitter.dragging {
+  border-color: #465362;
+  background: #161d25;
+}
+
+.map-chart-splitter:hover span,
+.map-chart-splitter.dragging span {
+  background: #7dd3fc;
+}
+
+.map-chart-splitter:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: -2px;
+}
+
+.map-chart-splitter-dragging,
+.map-chart-splitter-dragging * {
+  user-select: none;
 }
 
 .course-canvas-wrap {
@@ -200,7 +311,7 @@ textarea {
 
 .load-state {
   display: grid;
-  min-height: 100vh;
+  min-height: 540px;
   place-items: center;
   color: #bac4cf;
 }
@@ -218,13 +329,14 @@ textarea {
 
 .title-block h1 {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 750;
 }
 
 .title-block p {
   margin: 0;
   color: #aeb8c3;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -236,6 +348,7 @@ textarea {
 
 .control-row button,
 .segmented-group button,
+.toolbar-group button,
 .command-button,
 .section-button {
   border: 1px solid #34404c;
@@ -247,12 +360,14 @@ textarea {
 
 .control-row button,
 .segmented-group button,
+.toolbar-group button,
 .command-button {
   min-height: 40px;
 }
 
 .control-row button.active,
 .segmented-group button.active,
+.toolbar-group button.active,
 .section-button.selected {
   border-color: #66d9e8;
   background: #26313a;
@@ -263,6 +378,8 @@ textarea {
 }
 
 .command-button:focus-visible,
+.toolbar-group button:focus-visible,
+.context-toggle:focus-within,
 .danger-dialog button:focus-visible {
   outline: 2px solid #93c5fd;
   outline-offset: 2px;
@@ -349,6 +466,67 @@ textarea {
 
 .course-legend small {
   color: #8391a3;
+}
+
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid #2b323b;
+  padding: 10px;
+  background: #121922;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.toolbar-group.two-up button {
+  min-width: 120px;
+}
+
+.toolbar-group.three-up button {
+  min-width: 74px;
+}
+
+.section-toolbar button {
+  min-width: 42px;
+  padding-inline: 0;
+}
+
+.utility-toolbar {
+  margin-left: auto;
+}
+
+.utility-toolbar .command-button {
+  width: auto;
+  padding-inline: 12px;
+}
+
+.utility-toolbar .context-toggle {
+  min-height: 40px;
+}
+
+.map-toolbar-support {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid #2b323b;
+  padding: 8px 10px;
+  background: #111820;
+}
+
+.map-toolbar-support .course-legend {
+  grid-template-columns: repeat(4, minmax(0, auto));
+  justify-content: start;
+}
+
+.map-toolbar-support .course-legend em,
+.map-toolbar-support .course-legend small {
+  grid-column: 1 / -1;
 }
 
 .slider-row {
@@ -789,8 +967,21 @@ textarea {
 
 .session-browser-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+
+.session-browser-command-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.session-browser-toggle-row {
+  justify-content: start;
+  min-width: 0;
+  width: 100%;
+  padding-inline: 2px;
+  white-space: nowrap;
 }
 
 .compact-toggle {
@@ -800,9 +991,24 @@ textarea {
 .session-card-list {
   display: grid;
   gap: 8px;
-  max-height: 320px;
+  max-height: min(420px, 42dvh);
   overflow: auto;
-  padding-right: 2px;
+  scrollbar-color: #465362 #151b24;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+
+.session-card-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.session-card-list::-webkit-scrollbar-track {
+  background: #151b24;
+}
+
+.session-card-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #465362;
 }
 
 .session-card {

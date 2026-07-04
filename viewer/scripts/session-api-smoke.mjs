@@ -159,5 +159,6 @@ assert.match(componentSource, /parseProjectedLapCsv/, "API-loaded CSV should use
 assert.match(componentSource, /process_status === "processed"[\s\S]*return ""/, "processed sessions should not show redundant ready-state copy");
 assert.match(componentSource, /selectedActionHelp \? <p className="status-text">\{selectedActionHelp\}<\/p> : null/, "session help text should render only when meaningful");
 assert.match(componentSource, /catch \(error\)[\s\S]*setErrorText[\s\S]*finally/, "API failure should report an error without clearing parent telemetry");
-assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/, "default elevation should remain 5x");
+assert.match(appSource, /const COURSE_ELEVATION_DISPLAY_SCALE = 5/, "display elevation should remain fixed at 5x");
+assert.doesNotMatch(appSource, /setElevationScale/, "fixed display elevation should not expose a setter");
 console.log("session API smoke test passed");

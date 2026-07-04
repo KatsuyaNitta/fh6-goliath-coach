@@ -50,6 +50,8 @@ const MUTED_LINE_WIDTH = 2;
 const TELEMETRY_ROUTE_PROJECTION_SAMPLE_LIMIT = 1000;
 const BASE_PLANE_MARGIN = 1800;
 const GUIDE_DEDUP_DISTANCE_M = 1;
+const START_FINISH_MERGE_DISTANCE_M = 500;
+const START_FINISH_LABEL = "START / FINISH";
 
 type ViewMode = "2d" | "3d";
 interface SectionFocusRequest {
@@ -580,9 +582,12 @@ function buildElevationGuides(
   baselineDisplayY: number,
 ): ElevationGuide[] {
   const metadata = reference.coordinate_system.relative_elevation;
+  const startPoint = reference.points[0];
+  const finishPoint = reference.points[reference.points.length - 1];
+  const mergeStartFinish = areReferencePointsNear(startPoint, finishPoint, elevationScale, baselineDisplayY);
   const candidates: Array<{ label: string; point: ReferencePointTuple | undefined }> = [
-    { label: "START", point: reference.points[0] },
-    { label: "FINISH", point: reference.points[reference.points.length - 1] },
+    { label: "START", point: mergeStartFinish ? undefined : startPoint },
+    { label: "FINISH", point: mergeStartFinish ? undefined : finishPoint },
     { label: "MIN", point: nearestPointByDistance(reference.points, metadata.minimum_course_distance_m) },
     { label: "MAX", point: nearestPointByDistance(reference.points, metadata.maximum_course_distance_m) },
   ];
@@ -681,6 +686,8 @@ function CourseLines({
   }, [projectedLap]);
   const actualStartPoint = actualMarkersById.get("START") ?? actualRenderPoints[0];
   const actualFinishPoint = actualMarkersById.get("FINISH") ?? actualRenderPoints[actualRenderPoints.length - 1];
+  const mergeReferenceStartFinish = areReferencePointsNear(startPoint, finishPoint, elevationScale, baselineDisplayY);
+  const mergeActualStartFinish = areProjectedLapPointsNear(actualStartPoint, actualFinishPoint, elevationScale, baselineDisplayY);
 
   return (
     <group>
@@ -770,7 +777,16 @@ function CourseLines({
         />
       )) : null}
       {showReferenceCourse ? (
-        <>
+        mergeReferenceStartFinish ? (
+          <Marker
+            color="#35f28b"
+            label={START_FINISH_LABEL}
+            point={startPoint}
+            elevationScale={elevationScale}
+            baselineDisplayY={baselineDisplayY}
+          />
+        ) : (
+          <>
           <Marker
             color="#35f28b"
             label="START"
@@ -785,16 +801,24 @@ function CourseLines({
             elevationScale={elevationScale}
             baselineDisplayY={baselineDisplayY}
           />
-        </>
+          </>
+        )
       ) : null}
-      {showActualCourse && actualStartPoint ? (
+      {showActualCourse && actualStartPoint && actualFinishPoint && mergeActualStartFinish ? (
+        <Marker
+          color="#35f28b"
+          label={START_FINISH_LABEL}
+          position={projectedLapPointToRenderVector(actualStartPoint, elevationScale, baselineDisplayY)}
+        />
+      ) : null}
+      {showActualCourse && actualStartPoint && !mergeActualStartFinish ? (
         <Marker
           color="#35f28b"
           label="START"
           position={projectedLapPointToRenderVector(actualStartPoint, elevationScale, baselineDisplayY)}
         />
       ) : null}
-      {showActualCourse && actualFinishPoint ? (
+      {showActualCourse && actualFinishPoint && !mergeActualStartFinish ? (
         <Marker
           color="#ff4f64"
           label="FINISH"
@@ -1029,6 +1053,36 @@ function Marker({
         <span className={labelDimmed ? "scene-label scene-label-dimmed" : "scene-label"}>{label}</span>
       </Html>
     </group>
+  );
+}
+
+function areReferencePointsNear(
+  first: ReferencePointTuple | undefined,
+  second: ReferencePointTuple | undefined,
+  elevationScale: number,
+  baselineDisplayY: number,
+): boolean {
+  if (!first || !second) {
+    return false;
+  }
+  return (
+    referencePointToRenderVector(first, elevationScale, baselineDisplayY)
+      .distanceTo(referencePointToRenderVector(second, elevationScale, baselineDisplayY)) <= START_FINISH_MERGE_DISTANCE_M
+  );
+}
+
+function areProjectedLapPointsNear(
+  first: ProjectedLapPoint | undefined,
+  second: ProjectedLapPoint | undefined,
+  elevationScale: number,
+  baselineDisplayY: number,
+): boolean {
+  if (!first || !second) {
+    return false;
+  }
+  return (
+    projectedLapPointToRenderVector(first, elevationScale, baselineDisplayY)
+      .distanceTo(projectedLapPointToRenderVector(second, elevationScale, baselineDisplayY)) <= START_FINISH_MERGE_DISTANCE_M
   );
 }
 

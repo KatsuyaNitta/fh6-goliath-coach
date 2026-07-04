@@ -148,6 +148,17 @@ assert.match(panelSource, /CHART_TEXT\.title/);
 assert.match(panelSource, /CHART_TEXT\.fullLap/);
 assert.match(panelSource, /CHART_TEXT\.selectedSection/);
 assert.match(panelSource, /CHART_TEXT\.clearCursor/);
+assert.match(panelSource, /const CURSOR_ALTITUDE_LABEL = "高度"/);
+assert.match(panelSource, /baselineDisplayY=\{reference\.coordinate_system\.relative_elevation\.baseline_display_y\}/);
+assert.match(panelSource, /getRelativeHeightM\(displayY, baselineDisplayY\)/);
+assert.match(panelSource, /Math\.round\(getRelativeHeightM\(displayY, baselineDisplayY\)\)/);
+assert.doesNotMatch(panelSource, /COURSE_ELEVATION_DISPLAY_SCALE|elevationScale/, "cursor altitude should not use the 5x map display scale");
+assert.ok(
+  panelSource.indexOf("<dt>{CHART_TEXT.distance}</dt>") < panelSource.indexOf("<dt>{CHART_TEXT.section}</dt>") &&
+    panelSource.indexOf("<dt>{CHART_TEXT.section}</dt>") < panelSource.indexOf("<dt>{CURSOR_ALTITUDE_LABEL}</dt>") &&
+    panelSource.indexOf("<dt>{CURSOR_ALTITUDE_LABEL}</dt>") < panelSource.indexOf("<dt>{CHART_TEXT.lapTime}</dt>"),
+  "cursor readout should show distance, section, altitude, then lap time",
+);
 assert.doesNotMatch(appSource, /UI_TEXT\.loadCsvManually|manualCsvDescription|projectedLapInputRef|handleProjectedLapFile/);
 assert.doesNotMatch(appSource, /accept="\.csv,text\/csv"|type="file"/);
 assert.match(panelSource, /ProjectedLapPayload/);
@@ -173,7 +184,8 @@ const desktopBreakpointBlock = stylesSource.match(/@media \(max-width: 1100px\) 
 assert.doesNotMatch(desktopBreakpointBlock, /\.telemetry-chart-track[\s\S]*?grid-template-columns:\s*1fr/);
 assert.match(tasksSource, /- \[x\] Overview map mode:/);
 assert.match(tasksSource, /slow automatic rotation/);
-assert.match(appSource, /const \[elevationScale, setElevationScale\] = useState\(5\)/);
+assert.match(appSource, /const COURSE_ELEVATION_DISPLAY_SCALE = 5/);
+assert.doesNotMatch(appSource, /setElevationScale/);
 const lifecycleCall = appSource.slice(appSource.indexOf("const cameraLifecycleKey"), appSource.indexOf("}, [cameraResetKey"));
 assert.doesNotMatch(lifecycleCall, /activeTelemetryPoint|hoveredTelemetryPoint|pinnedTelemetryPoint/);
 console.log("telemetry chart smoke test passed");

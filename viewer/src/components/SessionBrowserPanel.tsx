@@ -143,16 +143,18 @@ export function SessionBrowserPanel({ loadedSessionId, onLoadProjectedLap }: Ses
         <p>{SESSION_TEXT.description}</p>
       </div>
       <div className="session-browser-actions">
-        <button className="command-button" disabled={loadingList || busy} type="button" onClick={() => void refreshSessions()}>
-          {loadingList ? SESSION_TEXT.refreshing : SESSION_TEXT.refresh}
-        </button>
-        <label className="context-toggle compact-toggle">
+        <div className="session-browser-command-row">
+          <button className="command-button" disabled={loadingList || busy} type="button" onClick={() => void refreshSessions()}>
+            {loadingList ? SESSION_TEXT.refreshing : SESSION_TEXT.refresh}
+          </button>
+          <button className="command-button" disabled={!statusText && !errorText} type="button" onClick={() => { setStatusText(""); setErrorText(""); }}>
+            {SESSION_TEXT.clear}
+          </button>
+        </div>
+        <label className="context-toggle compact-toggle session-browser-toggle-row">
           <input checked={showIgnored} onChange={(event) => setShowIgnored(event.target.checked)} type="checkbox" />
           {SESSION_TEXT.showIgnored}
         </label>
-        <button className="command-button" disabled={!statusText && !errorText} type="button" onClick={() => { setStatusText(""); setErrorText(""); }}>
-          {SESSION_TEXT.clear}
-        </button>
       </div>
       {errorText ? <p className="status-text error-text">{errorText}</p> : null}
       {statusText ? <p className="status-text">{statusText}</p> : null}
