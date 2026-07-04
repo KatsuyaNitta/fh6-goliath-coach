@@ -449,17 +449,20 @@ export function App() {
             </div>
 
             <div className="toolbar-group section-toolbar" aria-label={UI_TEXT.sections}>
-              {reference?.sections.map((section) => (
-                <button
-                  className={section.id === selectedSectionId ? "active" : ""}
-                  aria-pressed={section.id === selectedSectionId}
-                  key={section.id}
-                  type="button"
-                  onClick={() => selectSectionForFocus(section.id)}
-                >
-                  {section.id}
-                </button>
-              ))}
+              {reference?.sections.map((section) => {
+                const sectionIsActive = mapDisplayMode === "section-focus" && section.id === selectedSectionId;
+                return (
+                  <button
+                    className={sectionIsActive ? "active" : ""}
+                    aria-pressed={sectionIsActive}
+                    key={section.id}
+                    type="button"
+                    onClick={() => selectSectionForFocus(section.id)}
+                  >
+                    {section.id}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="toolbar-group three-up" aria-label={UI_TEXT.courseColorMode}>
