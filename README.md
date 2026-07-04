@@ -13,16 +13,20 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 - Goliath の 1 m 間隔の基準走行パスの 3D 表示（ラップ未読込み時の表示フォールバック）
 - S1-S6 の 6 区間表示
 - P1-P5 の区間境界データ（通常の 3D コースビューでは非表示）
+- 左ペイン、中央ワークスペース、右ペインで構成する Three-Pane Analysis Workspace
+- 中央ワークスペースのマップ / テレメトリチャート分割表示と、ドラッグ可能な上下スプリッター
 - Overview モードでの全コース表示、S1-S6 の均等強調、低速 3D 自動回転
 - 手動の回転、ズーム、パンによる Overview 自動回転の停止
 - OS またはブラウザの reduced-motion 設定に応じた自動回転の無効化
-- Section Focus モードでの選択区間強調、区間別の決定的な 3D カメラフレーミング、巻き戻し選択からの分析ナビゲーション
+- S1-S6 の直接クリックによる Section Focus、選択区間チャートへの切り替え、区間別の決定的な 3D カメラフレーミング
+- マップ表示スコープと Telemetry Charts の `全周` / `選択セクション` 範囲の同期
 - Japanese UI Phase 1 による日本語ファーストの画面表示
 - 3D 視点の回転、ズーム、パン
 - 通常UIは 3D 表示に固定
-- 高さ倍率の変更
+- マップ上の高度表示はコース最低地点を `0 m` とした相対高度で、3D 表示だけ固定 5 倍スケール
+- 中央マップツールバーでの `全体表示`、S1-S6、`Section` / `速度` / `操作`、カメラリセット、`高度ガイド`、`巻き戻し` 表示切り替え
 - 解析用基準パスから生成したコース形状データ（方位、勾配、符号付き曲率、推定半径、左右/上り下り分類、品質フラグ）
-- Viewer のコース色モード（セクション / 勾配 / 曲率）と、チャート hover/pin に連動するコース形状 readout
+- Viewer のコース色モード（Section / 速度 / 操作）と、チャート hover/pin に連動するコース形状 readout
 - 実走行テレメトリ CSV とセッション JSON の処理
 - 完走ラップの抽出
 - 5 個の手動ハンドブレーキマーカーの検出
@@ -30,15 +34,20 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 - 有効ラップ読込み後は、通常ビューのコース表示を実走行ラインへ自動切り替え
 - 総合タイムと S1-S6 区間タイム
 - 選択区間の強調と非選択区間のグレーアウト
+- Telemetry cursor readout での距離、セクション、高度、ラップタイム、Speed、Throttle、Brake、Steering 表示
 - 車両情報と Forza 順のチューニング値の保存、読み込み
 
-Section Focus は、選択区間の強調表示と、その区間ごとの決定的な 3D カメラフレーミングを適用する表示モードです。右側の S1-S6 セクションをクリックした場合、別区間のテレメトリチャート上の点をクリックしてピン留めした場合、巻き戻しマーカー・巻き戻しイベント・重点練習箇所候補を選択した場合に、その区間へ移動します。Overview からの巻き戻し選択、または現在と異なる区間の巻き戻し選択では、その区間の canonical focus pose へ移動します。同じ区間内の巻き戻し選択やチャート再ピン留めでは、ユーザーが調整したカメラ構図を維持します。チャートの hover や Full lap / Selected section の範囲切り替えは map display mode を変更しません。Reset camera は mode-aware で、Overview では全コース構図、Section Focus では現在の選択区間の canonical focus pose を復元します。Corner Focus はまだ実装していません。
+Three-Pane Analysis Workspace は、左ペインにローカルセッションと車両 / チューニング入力、中央ペインに 3D マップと Telemetry Charts、右ペインに巻き戻し概要、選択中の巻き戻し、Practice Focus などの分析結果を配置します。巻き戻し表示の ON/OFF は分析結果ではなくマップレイヤー操作として扱うため、右ペインではなく中央マップツールバーの `高度ガイド` 近くに置きます。
+
+Section Focus は、選択区間の強調表示と、その区間ごとの決定的な 3D カメラフレーミングを適用する表示モードです。中央ツールバーの S1-S6 をクリックすると、`selectedSectionId` を更新し、map display mode を Section Focus、チャート範囲を `選択セクション` に切り替え、その区間へ fit します。`全体表示` をクリックすると Overview と `全周` チャートへ戻ります。Telemetry Charts 側の `全周` / `選択セクション` も中央ワークスペースの分析スコープ切り替えとして扱い、`全周` は Overview、`選択セクション` は現在の選択区間の Section Focus と同期します。チャート hover はカメラを動かさず、チャート pin は既存の camera-neutral 仕様を維持します。巻き戻しマーカー・巻き戻しイベント・重点練習箇所候補を選択した場合は、その区間へ移動します。Overview からの巻き戻し選択、または現在と異なる区間の巻き戻し選択では、その区間の canonical focus pose へ移動します。同じ区間内の巻き戻し選択では、ユーザーが調整したカメラ構図を維持します。Reset camera は mode-aware で、Overview では全コース構図、Section Focus では現在の選択区間の canonical focus pose を復元します。Corner Focus はまだ実装していません。
 
 UI は日本語ファーストです。`Speed` / `Throttle` / `Brake` / `Steering`、`2D` / `3D`、`PI`、`FWD` / `RWD` / `AWD` は、ゲーム内表記やテレメトリ文脈との対応を保つため意図的に英語のまま表示します。車両・チューニングの表示単位は `PS`、`NM`、`KG`、`KGF/MM`、`cm` を使用します。この単位表記変更は表示ラベルのみで、数値変換は行わず、`power_ps`、`torque_nm`、`weight_kg`、`springs`、`ride_height` などの保存キーやバックエンド契約も変更しません。言語切り替えや本格的な i18n フレームワークは今後の作業です。
 
 通常ビューでは、Reference / Actual のレイヤー切り替えチェックボックスは表示しません。有効なラップがまだ読込まれていない場合は、分析用の基準パスをコース表示のフォールバックとして描画します。有効なラップを読込んだ後は、実走行トレースを通常の可視コースとして描画し、基準パスは距離、区間、マーカー、投影、カメラ安定化などの内部解析用バックボーンとして保持します。基準パスは理想ラインや公式中心線ではなく、将来の診断用参照オーバーレイは別作業です。
 
-P1-P5 は S1-S6 の内部境界定義として保持しますが、通常の 3D コースビューにはラベルや球体マーカーとして表示しません。区間境界は S1-S6 の色分けと Section Focus で示します。START / FINISH は分析上の意味が異なるため、3D コースビュー上に引き続き表示します。テレメトリチャートの P1-P5 ガイド線は、距離軸の参照として残します。
+P1-P5 は S1-S6 の内部境界定義として保持しますが、通常の 3D コースビューにはラベルや球体マーカーとして表示しません。区間境界は S1-S6 の色分けと Section Focus で示します。START と FINISH が同じ地点または近接地点の場合は、3D コースビュー上で 1 つの `START / FINISH` ラベルとして表示します。テレメトリチャートの P1-P5 ガイド線は、距離軸の参照として残します。
+
+高度表示は、コース最低地点を `0 m` とする表示用の相対高度を使います。3D マップでは起伏を読み取りやすくするため縦方向だけ固定 5 倍で描画しますが、この倍率は readout の数値、チャート、投影済みラップ、バックエンド schema には反映しません。Telemetry cursor readout のユーザー向けラベルは `高度` で、基本は整数の `m` 表示、欠損時は `N/A` です。
 
 コース形状データは、記録済みの分析用基準パスから推定した診断補助データです。公式の道路形状、道路中心線、道幅、道路端、理想ラインではありません。各点の `display_x/display_y/display_z` は開始地点からの差分で、バックエンドの形状計算ではレンダー用の `-display_z` 変換は使いません。方位は `0 deg = +display_z`、`90 deg = +display_x`、時計回りを正とし、符号付き曲率は左を正、右を負として保存します。利用できない値は `null` とし、0 として扱いません。
 
@@ -74,17 +83,14 @@ S1-S6 の区間タイム合計はラップタイムと約 `0.044 s` 異なりま
 - 有効ラップ読込み後の通常ビューでは、実走行トレースが可視コース表示になります。
 - ローカルの生テレメトリと生成済み処理データは Git 管理外です。
 - 旧 2D/3D 切り替えは通常UIから外しており、将来の top-down 分析ビューは必要性が明確になった場合に別途検討します。
-- リプレイ、テレメトリチャート、走行品質分析はまだ実装していません。
+- リプレイと最終的な走行品質診断はまだ実装していません。
 - 現在のブラウザ入力は大きな処理済み CSV を使っており、将来的には軽量な表示用データ形式が必要です。
 
 ### 今後の予定
 
-- コース最低地点を `0 m` とする相対高度表示
-- `0 m` 基準面と縦方向の高さガイド
 - 軽量なブラウザ表示用ラップデータ
 - セクション境界時刻の補間
 - 2D 地図表示の修正
-- テレメトリチャート
 - 3D リプレイ
 - 運転改善ポイントの検出
 - 根拠付きの日本語改善提案
@@ -93,9 +99,11 @@ S1-S6 の区間タイム合計はラップタイムと約 `0.044 s` 異なりま
 
 FH6 Goliath Coach is a browser-based telemetry-analysis and reference-path visualization tool for the Goliath course in Forza Horizon 6.
 
-Current capabilities include a 1 m sampled reference path, S1-S6 sections, internal P1-P5 boundary definitions, continuity-constrained telemetry projection, completed-lap extraction, automatic actual-trace course display after a valid lap is loaded, section timing, selected-section emphasis, Overview map mode, Japanese-first UI Phase 1, and vehicle/tune metadata save/load.
+Current capabilities include a 1 m sampled reference path, S1-S6 sections, internal P1-P5 boundary definitions, continuity-constrained telemetry projection, completed-lap extraction, automatic actual-trace course display after a valid lap is loaded, section timing, a three-pane analysis workspace, synchronized map/chart analysis scope, telemetry charts, selected-section emphasis, Overview map mode, Japanese-first UI Phase 1, and vehicle/tune metadata save/load.
 
-The viewer opens in **Overview** mode. Overview frames the full Goliath course, renders S1-S6 with equal emphasis, and slowly auto-rotates in 3D unless `prefers-reduced-motion: reduce` is active. Manual camera interaction stops that rotation. Clicking an explicit S1-S6 section control enters **Section Focus** and applies that section's deterministic canonical camera framing. Selecting a rewind marker, rewind event, or Practice Focus candidate is also an explicit analysis navigation action: it enters Section Focus, applies the canonical pose when coming from Overview or moving to another section, and preserves the user's manual camera composition for same-section rewind navigation. Pinning a telemetry chart point follows the same section-change reframe rule; chart hover and chart range controls remain passive and do not change the map display mode. Reset camera is mode-aware: Overview restores the full-course pose, while Section Focus restores the selected section's canonical pose. Corner Focus remains future work.
+The workspace is split into a left input pane, a central map/chart workspace, and a right interpretation pane. The central workspace stacks the 3D map and telemetry charts with a draggable vertical-size splitter. The map toolbar owns display-scope and layer controls: `全体表示`, direct S1-S6 focus buttons, `Section` / `速度` / `操作` color modes, camera reset, `高度ガイド`, and `巻き戻し`. The right pane keeps analysis output such as rewind summaries, the selected rewind, and Practice Focus candidates.
+
+The viewer opens in **Overview** mode. Overview frames the full Goliath course, renders S1-S6 with equal emphasis, and slowly auto-rotates in 3D unless `prefers-reduced-motion: reduce` is active. Manual camera interaction stops that rotation. Clicking an S1-S6 button enters **Section Focus**, updates the chart range to `選択セクション`, and fits that section with its deterministic canonical camera framing. Clicking `全体表示` returns both the map and charts to the full-lap scope. Telemetry Charts `全周` / `選択セクション` controls are also analysis-scope controls: `全周` returns to Overview and the full chart range, while `選択セクション` enters Section Focus for the current section. Selecting a rewind marker, rewind event, or Practice Focus candidate is also an explicit analysis navigation action. Chart hover never moves the camera, and chart pinning preserves the existing camera-neutral behavior. Reset camera is mode-aware: Overview restores the full-course pose, while Section Focus restores the selected section's canonical pose. Corner Focus remains future work.
 
 The displayed UI is Japanese-first. `Speed`, `Throttle`, `Brake`, `Steering`, `2D`, `3D`, `PI`, and drivetrain abbreviations remain English intentionally. Display units use `PS`, `NM`, `KG`, `KGF/MM`, and `cm` exactly; this does not convert numeric values or rename persisted JSON keys or backend/API fields. A full language switcher or i18n framework is still future work.
 
@@ -103,7 +111,9 @@ Unitless game values in the tune form no longer show artificial `game` or `deg` 
 
 The reference path is not official road geometry, not an official road centerline, and not an ideal racing line. It is an internal analytical backbone generated from recorded driving coordinates. Before a valid lap is loaded, the viewer shows it as the fallback course representation. After a valid lap is loaded, the normal visible course becomes the loaded actual driving trace; the reference path remains available internally for course distance, sections, markers, projection, and camera stability. The normal UI no longer exposes Reference / Actual layer checkboxes. A future diagnostic reference overlay is out of scope for the normal viewer.
 
-P1-P5 remain internal section-boundary definitions, but the normal 3D course view no longer renders them as labels or sphere markers. S1-S6 color segmentation and Section Focus communicate section boundaries instead. START and FINISH remain visible. Telemetry charts still draw P1-P5 guide lines on the distance axis.
+P1-P5 remain internal section-boundary definitions, but the normal 3D course view no longer renders them as labels or sphere markers. S1-S6 color segmentation and Section Focus communicate section boundaries instead. When START and FINISH are colocated or near each other, the 3D course view renders them as one `START / FINISH` label. Telemetry charts still draw P1-P5 guide lines on the distance axis.
+
+Elevation is displayed relative to the lowest point on the course, with that point shown as `0 m`. The 3D map uses a fixed 5x vertical display scale so course relief is easier to read, but that scale does not affect readout numbers, chart data, projected-lap data, or backend schemas. The telemetry cursor readout labels this value as `高度`, displays integer metres by default, and shows `N/A` when no value is available.
 
 ## Reference CSV
 
@@ -345,9 +355,9 @@ Loaded projected laps now show four distance-based Canvas telemetry tracks:
 - Brake, from `brake_pct`, in percent;
 - Steering, from `steer_norm`, displayed as raw normalized input from `-1` to `+1` without left/right interpretation.
 
-The shared x-axis is `course_distance_m`, displayed in kilometres. Use **Full lap** to inspect the complete lap or **Selected section** to focus on the currently selected S1-S6 section. The charts draw subtle S1-S6 background bands, P1-P5 reference marker lines, and rewind event markers.
+The shared x-axis is `course_distance_m`, displayed in kilometres. Use **全周** to inspect the complete lap and return the map to Overview, or **選択セクション** to focus both the charts and map on the currently selected S1-S6 section. Clicking S1-S6 in the map toolbar also switches the charts to that section range. The charts draw subtle S1-S6 background bands, P1-P5 reference marker lines, and rewind event markers.
 
-Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a fixed-size screen-space location HUD on the course. The HUD uses the projected route point as its anchor and shows speed, accelerator, brake, and steering beside the map point while keeping the same pixel size during zoom; it is not a vehicle model and does not represent heading or travel direction. The diamond stays on the exact route position, while the card prefers an above-point quadrant and uses projected-route overlap scoring to avoid covering dense course geometry where practical. Distance, section, lap time, and geometry details remain in the accessible lower readout, which continues to show course distance, section, speed, heading, gradient, curvature, radius, turn direction, slope direction, and quality values separately. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
+Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a fixed-size screen-space location HUD on the course. The HUD uses the projected route point as its anchor and shows speed, accelerator, brake, and steering beside the map point while keeping the same pixel size during zoom; it is not a vehicle model and does not represent heading or travel direction. The diamond stays on the exact route position, while the card prefers an above-point quadrant and uses projected-route overlap scoring to avoid covering dense course geometry where practical. Distance, section, elevation, lap time, and telemetry values remain in the accessible lower readout, with `高度` using course-minimum-relative metres and not the map's fixed 5x display scale. Geometry details continue to show heading, gradient, curvature, radius, turn direction, slope direction, and quality values separately. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
 
 ## Practice Focus Candidates
 
