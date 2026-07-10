@@ -24,3 +24,16 @@ data/processed/
 !tests/fixtures/**/*_telemetry.csv
 !tests/fixtures/**/*_session.json
 TASKS.md
+viewer/scripts/course-geometry-smoke.mjs
+viewer/scripts/course-geometry-smoke.mjs
+viewer/scripts/course-geometry-smoke.mjs
+viewer/scripts/map-display-mode-smoke.mjs
+viewer/scripts/telemetry-chart-smoke.mjs
+viewer/src/App.tsx
+viewer/src/components/CourseScene.tsx
+viewer/src/components/TelemetryChartCanvas.tsx
+viewer/src/components/TelemetryChartsPanel.tsx
+viewer/src/lib/courseColorMode.ts
+viewer/src/lib/speedDisplay.ts
+viewer/src/styles.css
+viewer/src/lib/telemetryChart.ts

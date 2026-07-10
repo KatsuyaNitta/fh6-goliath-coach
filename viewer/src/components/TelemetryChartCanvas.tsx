@@ -213,7 +213,7 @@ function drawStaticLayer(canvas: HTMLCanvasElement | null, args: StaticLayerArgs
   context.clearRect(0, 0, size.width, size.height);
   drawFrame(context, size);
   drawSectionBands(context, sections, range, size, showSectionLabels);
-  drawAxisLabels(context, range, domain, size, showDistanceLabels);
+  drawAxisLabels(context, range, domain, size, showDistanceLabels, channel);
   if (channel.id === "steering") {
     const y = valueToY(0, domain, size);
     context.strokeStyle = "rgba(226,232,240,0.22)";
@@ -353,14 +353,19 @@ function drawAxisLabels(
   domain: [number, number],
   size: { width: number; height: number },
   showDistanceLabels: boolean,
+  channel: TelemetryChannelConfig,
 ): void {
   context.fillStyle = "rgba(226,232,240,0.75)";
-  context.fillText(domain[1].toFixed(domain[1] <= 2 ? 1 : 0), 8, PADDING_TOP + 8);
-  context.fillText(domain[0].toFixed(domain[1] <= 2 ? 1 : 0), 8, size.height - PADDING_BOTTOM);
+  context.fillText(formatAxisValue(domain[1], domain, channel), 8, PADDING_TOP + 8);
+  context.fillText(formatAxisValue(domain[0], domain, channel), 8, size.height - PADDING_BOTTOM);
   if (showDistanceLabels) {
     context.fillText(`${(range.startM / 1000).toFixed(1)} km`, PADDING_LEFT, size.height - 6);
     context.fillText(`${(range.endM / 1000).toFixed(1)} km`, size.width - 72, size.height - 6);
   }
+}
+
+function formatAxisValue(value: number, domain: [number, number], channel: TelemetryChannelConfig): string {
+  return channel.formatValueLabel ? channel.formatValueLabel(value) : value.toFixed(domain[1] <= 2 ? 1 : 0);
 }
 
 function valueDomain(points: ProjectedLapPoint[], channel: TelemetryChannelConfig): [number, number] {

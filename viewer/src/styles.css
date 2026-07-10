@@ -502,6 +502,7 @@ textarea {
   margin-left: auto;
 }
 
+.utility-toolbar button,
 .utility-toolbar .command-button {
   width: auto;
   padding-inline: 12px;
@@ -1222,21 +1223,76 @@ textarea {
   margin: 0;
 }
 
-.telemetry-cursor-readout div,
-.telemetry-cursor-values div {
+.telemetry-cursor-readout div {
   display: flex;
   gap: 4px;
   min-width: 0;
+}
+
+.telemetry-cursor-values > div {
+  --readout-field-width: 100px;
+
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 4px;
+  flex: 0 0 var(--readout-field-width);
+  width: var(--readout-field-width);
+  min-width: var(--readout-field-width);
+  line-height: 1.25;
+}
+
+.telemetry-cursor-values > div[data-field="distance"] {
+  --readout-field-width: 112px;
+}
+
+.telemetry-cursor-values > div[data-field="section"] {
+  --readout-field-width: 82px;
+}
+
+.telemetry-cursor-values > div[data-field="altitude"] {
+  --readout-field-width: 86px;
+}
+
+.telemetry-cursor-values > div[data-field="lap-time"] {
+  --readout-field-width: 124px;
+}
+
+.telemetry-cursor-values > div[data-field="speed"] {
+  --readout-field-width: 124px;
+}
+
+.telemetry-cursor-values > div[data-field="throttle"] {
+  --readout-field-width: 100px;
+}
+
+.telemetry-cursor-values > div[data-field="brake"] {
+  --readout-field-width: 82px;
+}
+
+.telemetry-cursor-values > div[data-field="steering"] {
+  --readout-field-width: 104px;
+}
+
+.telemetry-cursor-values > div[data-field="section-time"] {
+  --readout-field-width: 140px;
 }
 
 .telemetry-cursor-readout dt {
   color: #8f9ba8;
 }
 
+.telemetry-cursor-values dt,
+.telemetry-cursor-values dd {
+  line-height: inherit;
+  white-space: nowrap;
+}
+
 .telemetry-cursor-readout dd {
   margin: 0;
   color: #f8fafc;
-  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 .telemetry-chart-stack {

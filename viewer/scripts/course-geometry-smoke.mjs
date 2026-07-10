@@ -16,7 +16,7 @@ async function compileModule(sourceUrl, filename) {
   const viewerRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
   const directory = join(viewerRoot, ".tmp-smoke", `fh6-course-geometry-${Date.now()}-${Math.random()}`);
   await mkdir(directory, { recursive: true });
-  for (const dependency of ["reference", "courseGeometry", "uiText", "courseOperationMode"]) {
+  for (const dependency of ["reference", "courseGeometry", "uiText", "courseOperationMode", "speedDisplay"]) {
     const dependencySource = await readFile(new URL(`../src/lib/${dependency}.ts`, import.meta.url), "utf-8");
     const dependencyCompiled = ts.transpileModule(rewriteLocalImports(dependencySource), {
       compilerOptions: {
@@ -38,6 +38,7 @@ function rewriteLocalImports(source) {
     .replaceAll('from "./reference"', 'from "./reference.mjs"')
     .replaceAll('from "./courseGeometry"', 'from "./courseGeometry.mjs"')
     .replaceAll('from "./courseOperationMode"', 'from "./courseOperationMode.mjs"')
+    .replaceAll('from "./speedDisplay"', 'from "./speedDisplay.mjs"')
     .replaceAll('from "./uiText"', 'from "./uiText.mjs"');
 }
 
@@ -191,11 +192,10 @@ const uiTextSource = await readFile(new URL("../src/lib/uiText.ts", import.meta.
 const colorModeSource = await readFile(new URL("../src/lib/courseColorMode.ts", import.meta.url), "utf-8");
 const placementSource = await readFile(new URL("../src/lib/telemetryCalloutPlacement.ts", import.meta.url), "utf-8");
 
-assert.match(sceneSource, /formatTelemetryCursorSpeed\(activeTelemetryPoint\?\.speedKmh\)/);
-assert.match(sceneSource, /Math\.round\(speedKmh\)/);
-assert.match(sceneSource, /`\$\{Math\.round\(speedKmh\)\} km\/h`/);
+assert.match(sceneSource, /formatTelemetryCursorSpeed\(activeTelemetryPoint\?\.speedKmh, speedDisplayUnit\)/);
+assert.match(sceneSource, /formatSpeedDisplay\(speedKmh, unit, UI_TEXT\.speedUnavailable\)/);
 assert.doesNotMatch(sceneSource, /telemetry-cursor-label">\{\(point\.courseDistanceM \/ 1000\)\.toFixed\(3\)\} km/);
-assert.match(sceneSource, /return UI_TEXT\.speedUnavailable/);
+assert.match(sceneSource, /UI_TEXT\.speedUnavailable/);
 assert.match(sceneSource, /function TelemetryCursorProjector/);
 assert.match(sceneSource, /className="telemetry-cursor-hud"/);
 assert.match(sceneSource, /className="telemetry-cursor-callout"/);
@@ -240,9 +240,9 @@ assert.doesNotMatch(sceneSource, /<tetrahedronGeometry/);
 assert.doesNotMatch(sceneSource, /distanceFactor=\{11000\} position=\{\[0, 430, 0\]\}/);
 assert.match(sceneSource, /function RewindClusterMarker[\s\S]*<sphereGeometry args=\{\[selected \? 180 : 135, 18, 18\]\}/);
 
-assert.match(appSource, /<dt>\{UI_TEXT\.speed\}<\/dt><dd>\{formatSpeed\(activeTelemetryPoint\?\.speedKmh\)\}<\/dd>/);
-assert.match(appSource, /function formatSpeed\(speedKmh: number \| undefined\): string/);
-assert.match(appSource, /return `\$\{Math\.round\(speedKmh\)\} km\/h`/);
+assert.match(appSource, /<dt>\{UI_TEXT\.speed\}<\/dt><dd>\{formatSpeed\(activeTelemetryPoint\?\.speedKmh, speedDisplayUnit\)\}<\/dd>/);
+assert.match(appSource, /function formatSpeed\(speedKmh: number \| undefined, unit: SpeedDisplayUnit\): string/);
+assert.match(appSource, /formatSpeedDisplay\(speedKmh, unit, CHART_TEXT\.unavailable\)/);
 assert.match(appSource, /<dt>\{UI_TEXT\.distance\}<\/dt><dd>\{\(activeGeometrySample\.courseDistanceM \/ 1000\)\.toFixed\(3\)\} km<\/dd>/);
 assert.match(appSource, /\(\["section", "speed", "operation"\] as CourseColorMode\[\]\)/);
 assert.doesNotMatch(appSource, /\(\["section", "gradient", "curvature"\] as CourseColorMode\[\]\)/);

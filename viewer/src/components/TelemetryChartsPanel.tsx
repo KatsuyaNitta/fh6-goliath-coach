@@ -1,5 +1,10 @@
 import type { ReferencePayload, SectionId } from "../lib/reference";
-import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
+import type {
+  ProjectedLapPayload,
+  ProjectedLapPoint,
+  ProjectedLapSectionSummary,
+  RewindClusterPayload,
+} from "../lib/telemetryLap";
 import {
   effectiveTelemetryPoints,
   telemetryChannelAvailable,
@@ -10,10 +15,12 @@ import {
   type TelemetryRangeMode,
 } from "../lib/telemetryChart";
 import { getRelativeHeightM } from "../lib/renderTransform";
+import { formatSpeedReadout, speedLegendValueLabel, speedUnitLabel, type SpeedDisplayUnit } from "../lib/speedDisplay";
 import { CHART_TEXT } from "../lib/uiText";
 import { TelemetryChartCanvas } from "./TelemetryChartCanvas";
 
 const CURSOR_ALTITUDE_LABEL = "高度";
+const CURSOR_SECTION_TIME_LABEL = "セクションタイム";
 
 interface TelemetryChartsPanelProps {
   reference: ReferencePayload | null;
@@ -28,6 +35,7 @@ interface TelemetryChartsPanelProps {
   onChartRangeModeChange: (mode: TelemetryRangeMode) => void;
   onSelectSection: (sectionId: SectionId) => void;
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
+  speedDisplayUnit: SpeedDisplayUnit;
 }
 
 export function TelemetryChartsPanel({
@@ -43,6 +51,7 @@ export function TelemetryChartsPanel({
   onChartRangeModeChange,
   onSelectSection,
   onSelectRewindCluster,
+  speedDisplayUnit,
 }: TelemetryChartsPanelProps) {
   if (!reference) {
     return null;
@@ -88,17 +97,22 @@ export function TelemetryChartsPanel({
           <CursorValues
             baselineDisplayY={reference.coordinate_system.relative_elevation.baseline_display_y}
             point={cursorPoint}
+            sectionSummaries={projectedLap.sectionSummaries}
+            speedDisplayUnit={speedDisplayUnit}
           />
         ) : <span>{CHART_TEXT.cursorHelp}</span>}
       </div>
       <div className="telemetry-chart-stack">
         {TELEMETRY_CHANNELS.map((channel) => {
           const layout = TELEMETRY_TRACK_LAYOUTS[channel.id];
+          const displayChannel = channel.id === "speed"
+            ? { ...channel, unit: speedUnitLabel(speedDisplayUnit), formatValueLabel: (value: number) => speedLegendValueLabel(value, speedDisplayUnit) }
+            : channel;
           return (
             <TelemetryChartCanvas
               activePoint={cursorPoint}
               available={telemetryChannelAvailable(projectedLap, channel.id)}
-              channel={channel}
+              channel={displayChannel}
               height={layout.height}
               key={channel.id}
               markers={reference.markers}
@@ -126,17 +140,29 @@ export function TelemetryChartsPanel({
   );
 }
 
-function CursorValues({ baselineDisplayY, point }: { baselineDisplayY: number; point: ProjectedLapPoint }) {
+function CursorValues({
+  baselineDisplayY,
+  point,
+  sectionSummaries,
+  speedDisplayUnit,
+}: {
+  baselineDisplayY: number;
+  point: ProjectedLapPoint;
+  sectionSummaries: ProjectedLapSectionSummary[];
+  speedDisplayUnit: SpeedDisplayUnit;
+}) {
+  const sectionSummary = sectionSummaries.find((summary) => summary.sectionId === point.sectionId);
   return (
     <dl className="telemetry-cursor-values">
-      <div><dt>{CHART_TEXT.distance}</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
-      <div><dt>{CHART_TEXT.section}</dt><dd>{point.sectionId}</dd></div>
-      <div><dt>{CURSOR_ALTITUDE_LABEL}</dt><dd>{formatAltitude(point.displayY, baselineDisplayY)}</dd></div>
-      <div><dt>{CHART_TEXT.lapTime}</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>
-      <div><dt>Speed</dt><dd>{point.speedKmh.toFixed(1)} km/h</dd></div>
-      <div><dt>Throttle</dt><dd>{formatNullable(telemetryChannelValue(point, "throttle"), "%")}</dd></div>
-      <div><dt>Brake</dt><dd>{formatNullable(telemetryChannelValue(point, "brake"), "%")}</dd></div>
-      <div><dt>Steering</dt><dd>{formatNullable(telemetryChannelValue(point, "steering"), "")}</dd></div>
+      <div data-field="distance"><dt>{CHART_TEXT.distance}</dt><dd>{(point.courseDistanceM / 1000).toFixed(3)} km</dd></div>
+      <div data-field="section"><dt>{CHART_TEXT.section}</dt><dd>{point.sectionId}</dd></div>
+      <div data-field="altitude"><dt>{CURSOR_ALTITUDE_LABEL}</dt><dd>{formatAltitude(point.displayY, baselineDisplayY)}</dd></div>
+      <div data-field="lap-time"><dt>{CHART_TEXT.lapTime}</dt><dd>{formatSeconds(point.lapTimeS)}</dd></div>
+      <div data-field="speed"><dt>Speed</dt><dd>{formatSpeedReadout(point.speedKmh, speedDisplayUnit)}</dd></div>
+      <div data-field="throttle"><dt>Throttle</dt><dd>{formatNullable(telemetryChannelValue(point, "throttle"), "%")}</dd></div>
+      <div data-field="brake"><dt>Brake</dt><dd>{formatNullable(telemetryChannelValue(point, "brake"), "%")}</dd></div>
+      <div data-field="steering"><dt>Steering</dt><dd>{formatNullable(telemetryChannelValue(point, "steering"), "")}</dd></div>
+      <div data-field="section-time"><dt>{CURSOR_SECTION_TIME_LABEL}</dt><dd>{formatSectionTime(sectionSummary)}</dd></div>
     </dl>
   );
 }
@@ -160,4 +186,11 @@ function formatSeconds(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds - minutes * 60;
   return `${minutes}:${remainder.toFixed(3).padStart(6, "0")}`;
+}
+
+function formatSectionTime(summary: ProjectedLapSectionSummary | undefined): string {
+  if (!summary || summary.sampleCount <= 0 || !Number.isFinite(summary.elapsedTimeS)) {
+    return "N/A";
+  }
+  return formatSeconds(summary.elapsedTimeS);
 }

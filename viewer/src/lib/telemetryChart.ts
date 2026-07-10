@@ -10,6 +10,7 @@ export interface TelemetryChannelConfig {
   unit: string;
   description: string;
   fixedDomain?: [number, number];
+  formatValueLabel?: (value: number) => string;
 }
 
 export interface TelemetryTrackLayoutConfig {

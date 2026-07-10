@@ -17,6 +17,7 @@ import {
   type CourseGeometryPayload,
 } from "./lib/courseGeometry";
 import { courseColorLegend } from "./lib/courseColorMode";
+import { formatSpeedDisplay, type SpeedDisplayUnit } from "./lib/speedDisplay";
 import { telemetryChannelValue, type TelemetryRangeMode } from "./lib/telemetryChart";
 import { usePrefersReducedMotion } from "./lib/useReducedMotion";
 import { CHART_TEXT, UI_TEXT } from "./lib/uiText";
@@ -56,6 +57,7 @@ export function App() {
   const [loadedSessionId, setLoadedSessionId] = useState("");
   const [loadedVehicleMetadata, setLoadedVehicleMetadata] = useState<LoadedSessionVehicleMetadata | null>(null);
   const [showElevationContext, setShowElevationContext] = useState(true);
+  const [speedDisplayUnit, setSpeedDisplayUnit] = useState<SpeedDisplayUnit>("kmh");
   const [showRewinds, setShowRewinds] = useState(true);
   const [selectedRewindClusterId, setSelectedRewindClusterId] = useState("");
   const [selectedRewindEventId, setSelectedRewindEventId] = useState("");
@@ -129,7 +131,7 @@ export function App() {
       setCourseColorMode("section");
     }
   }, [courseColorMode, operationColorModeAvailable, speedColorModeAvailable]);
-  const colorLegend = useMemo(() => courseColorLegend(courseColorMode), [courseColorMode]);
+  const colorLegend = useMemo(() => courseColorLegend(courseColorMode, speedDisplayUnit), [courseColorMode, speedDisplayUnit]);
   const colorModeStatusText = useMemo(() => {
     if (!projectedLap) {
       return UI_TEXT.courseColorRequiresLap;
@@ -499,6 +501,14 @@ export function App() {
                 />
                 {UI_TEXT.elevationContext}
               </label>
+              <button
+                className={speedDisplayUnit === "hirosue" ? "active" : ""}
+                aria-pressed={speedDisplayUnit === "hirosue"}
+                type="button"
+                onClick={() => setSpeedDisplayUnit((unit) => unit === "hirosue" ? "kmh" : "hirosue")}
+              >
+                ヒロスエ
+              </button>
               <label className="context-toggle compact-toggle">
                 <input
                   checked={showRewinds}
@@ -551,6 +561,7 @@ export function App() {
                   onSelectRewindCluster={selectRewindCluster}
                   onManualCameraInteraction={() => setOverviewRotationStopped(true)}
                   activeTelemetryPoint={activeTelemetryPoint}
+                  speedDisplayUnit={speedDisplayUnit}
                 />
                 <div className="orientation-indicator" aria-label={UI_TEXT.mapOrientation}>
                   <span>{UI_TEXT.xRight}</span>
@@ -595,6 +606,7 @@ export function App() {
             reference={reference}
             selectedRewindClusterId={selectedRewindClusterId}
             selectedSectionId={selectedSectionId}
+            speedDisplayUnit={speedDisplayUnit}
           />
         </section>
 
@@ -606,7 +618,7 @@ export function App() {
                 <div><dt>{UI_TEXT.distance}</dt><dd>{(activeTelemetryPoint.courseDistanceM / 1000).toFixed(3)} km</dd></div>
                 <div><dt>{CHART_TEXT.section}</dt><dd>{activeTelemetryPoint.sectionId}</dd></div>
                 <div><dt>{UI_TEXT.lapTime}</dt><dd>{formatSeconds(activeTelemetryPoint.lapTimeS)}</dd></div>
-                <div><dt>Speed</dt><dd>{formatSpeed(activeTelemetryPoint.speedKmh)}</dd></div>
+                <div><dt>Speed</dt><dd>{formatSpeed(activeTelemetryPoint.speedKmh, speedDisplayUnit)}</dd></div>
                 <div><dt>Throttle</dt><dd>{formatTelemetryValue(telemetryChannelValue(activeTelemetryPoint, "throttle"), "%", 0)}</dd></div>
                 <div><dt>Brake</dt><dd>{formatTelemetryValue(telemetryChannelValue(activeTelemetryPoint, "brake"), "%", 0)}</dd></div>
                 <div><dt>Steering</dt><dd>{formatTelemetryValue(telemetryChannelValue(activeTelemetryPoint, "steering"), "", 3)}</dd></div>
@@ -621,7 +633,7 @@ export function App() {
               <h2>{UI_TEXT.courseGeometryReadout}</h2>
               <dl>
                 <div><dt>{UI_TEXT.distance}</dt><dd>{(activeGeometrySample.courseDistanceM / 1000).toFixed(3)} km</dd></div>
-                <div><dt>{UI_TEXT.speed}</dt><dd>{formatSpeed(activeTelemetryPoint?.speedKmh)}</dd></div>
+                <div><dt>{UI_TEXT.speed}</dt><dd>{formatSpeed(activeTelemetryPoint?.speedKmh, speedDisplayUnit)}</dd></div>
                 <div><dt>{CHART_TEXT.section}</dt><dd>{activeGeometrySample.sectionId}</dd></div>
                 <div><dt>{UI_TEXT.heading}</dt><dd>{formatNullable(activeGeometrySample.headingDeg, "deg", 1)}</dd></div>
                 <div><dt>{UI_TEXT.gradient}</dt><dd>{formatSignedNullable(activeGeometrySample.gradientPct, "%", 2)}</dd></div>
@@ -916,11 +928,8 @@ function formatNullable(value: number | null, unit: string, decimals: number): s
   return `${value.toFixed(decimals)} ${unit}`;
 }
 
-function formatSpeed(speedKmh: number | undefined): string {
-  if (speedKmh === undefined || !Number.isFinite(speedKmh)) {
-    return CHART_TEXT.unavailable;
-  }
-  return `${Math.round(speedKmh)} km/h`;
+function formatSpeed(speedKmh: number | undefined, unit: SpeedDisplayUnit): string {
+  return formatSpeedDisplay(speedKmh, unit, CHART_TEXT.unavailable);
 }
 
 function formatTelemetryValue(value: number | null, unit: string, decimals: number): string {

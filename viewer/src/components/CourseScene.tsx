@@ -36,6 +36,7 @@ import {
 import { telemetryChannelValue } from "../lib/telemetryChart";
 import type { ProjectedLapPayload, ProjectedLapPoint, RewindClusterPayload } from "../lib/telemetryLap";
 import { UI_TEXT } from "../lib/uiText";
+import { formatSpeedDisplay, type SpeedDisplayUnit } from "../lib/speedDisplay";
 
 const MUTED_SECTION_COLOR = "#343b44";
 const NON_SELECTED_OPACITY = 0.26;
@@ -88,6 +89,7 @@ interface CourseSceneProps {
   onSelectRewindCluster: (cluster: RewindClusterPayload) => void;
   onManualCameraInteraction: () => void;
   activeTelemetryPoint?: ProjectedLapPoint | null;
+  speedDisplayUnit: SpeedDisplayUnit;
 }
 
 export function CourseScene({
@@ -107,6 +109,7 @@ export function CourseScene({
   onSelectRewindCluster,
   onManualCameraInteraction,
   activeTelemetryPoint,
+  speedDisplayUnit,
 }: CourseSceneProps) {
   const telemetryCursorHudRef = useRef<HTMLDivElement | null>(null);
   const baselineDisplayY = reference.coordinate_system.relative_elevation.baseline_display_y;
@@ -191,7 +194,7 @@ export function CourseScene({
         ref={telemetryCursorHudRef}
       >
         <div className="telemetry-cursor-callout">
-          <div className="telemetry-cursor-speed">{formatTelemetryCursorSpeed(activeTelemetryPoint?.speedKmh)}</div>
+          <div className="telemetry-cursor-speed">{formatTelemetryCursorSpeed(activeTelemetryPoint?.speedKmh, speedDisplayUnit)}</div>
           <div className="telemetry-cursor-input-row">
             <span><b>アクセル</b><em className="telemetry-cursor-throttle">{formatTelemetryCursorPercent(telemetryCursorChannelValue(activeTelemetryPoint, "throttle"))}</em></span>
             <span><b>ブレーキ</b><em className="telemetry-cursor-brake">{formatTelemetryCursorPercent(telemetryCursorChannelValue(activeTelemetryPoint, "brake"))}</em></span>
@@ -938,11 +941,8 @@ function geometryOverlayWidth(baseWidth: number, band: GeometryDisplayBand): num
   return baseWidth + 0.75;
 }
 
-function formatTelemetryCursorSpeed(speedKmh: number | undefined): string {
-  if (speedKmh === undefined || !Number.isFinite(speedKmh)) {
-    return UI_TEXT.speedUnavailable;
-  }
-  return `${Math.round(speedKmh)} km/h`;
+function formatTelemetryCursorSpeed(speedKmh: number | undefined, unit: SpeedDisplayUnit): string {
+  return formatSpeedDisplay(speedKmh, unit, UI_TEXT.speedUnavailable);
 }
 
 function telemetryCursorChannelValue(

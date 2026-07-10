@@ -17,6 +17,7 @@ import type { SectionId } from "./reference";
 import { SECTION_COLORS } from "./reference";
 import type { ProjectedLapPoint } from "./telemetryLap";
 import { UI_TEXT } from "./uiText";
+import { speedLegendValueLabel, speedUnitLabel, type SpeedDisplayUnit } from "./speedDisplay";
 
 export const GRADIENT_DISPLAY_THRESHOLD_PCT = 1.0;
 export const CURVATURE_DISPLAY_THRESHOLD_1PM = 0.0015;
@@ -203,17 +204,19 @@ export function geometryRunKey(sample: GeometryDisplaySample): string {
   return `${sample.direction}:${sample.band}:${sample.halo ? "halo" : "plain"}`;
 }
 
-export function courseColorLegend(mode: CourseColorMode): CourseColorLegend | null {
+export function courseColorLegend(mode: CourseColorMode, speedDisplayUnit: SpeedDisplayUnit = "kmh"): CourseColorLegend | null {
   if (mode === "section") {
     return null;
   }
   if (mode === "speed") {
     return {
       mode,
-      labels: ["0", "80", "160", "240", "300", "360+"],
+      labels: SPEED_COLOR_STOPS.map((stop) => speedLegendValueLabel(stop.speedKmh, speedDisplayUnit)),
       colors: SPEED_COLOR_STOPS.map((stop) => stop.color),
       note: UI_TEXT.speedLegendNote,
-      helpText: UI_TEXT.speedLegendHelp,
+      helpText: speedDisplayUnit === "hirosue"
+        ? `速度 (${speedUnitLabel(speedDisplayUnit)}) は表示単位のみの切り替えです。色判定は従来どおり km/h の固定スケールです。`
+        : UI_TEXT.speedLegendHelp,
       unavailableColor: UNAVAILABLE_GEOMETRY_COLOR,
     };
   }

@@ -39,6 +39,13 @@ async function compileModule(sourceUrl, filename) {
 
 const telemetryLap = await compileModule(new URL("../src/lib/telemetryLap.ts", import.meta.url), "telemetryLap.mjs");
 const telemetryChart = await compileModule(new URL("../src/lib/telemetryChart.ts", import.meta.url), "telemetryChart.mjs");
+const speedDisplay = await compileModule(new URL("../src/lib/speedDisplay.ts", import.meta.url), "speedDisplay.mjs");
+
+assert.equal(speedDisplay.HIROSUE_KMH, 185);
+assert.equal(speedDisplay.formatSpeedReadout(185, "hirosue"), "1.00 ヒロスエ");
+assert.equal(speedDisplay.formatSpeedReadout(266.1, "hirosue"), "1.44 ヒロスエ");
+assert.equal(speedDisplay.formatSpeedDisplay(148, "hirosue"), "0.80 ヒロスエ");
+assert.equal(speedDisplay.formatSpeedReadout(266.1, "kmh"), "266.1 km/h");
 
 const newCsv = [
   "source_row_index,timestamp_s,lap_time_s,course_distance_m,section_id,projection_error_m,telemetry_display_x,telemetry_display_y,telemetry_display_z,speed_kmh,accel_pct,brake_pct,steer_norm,manual_marker_id,exclude_from_driving_analysis,is_effective,rewind_event_id,rewind_cluster_id,rewind_classification,rewind_confidence,rewind_impact_direction,rewound_time_s,rewound_course_distance_m",
@@ -149,15 +156,32 @@ assert.match(panelSource, /CHART_TEXT\.fullLap/);
 assert.match(panelSource, /CHART_TEXT\.selectedSection/);
 assert.match(panelSource, /CHART_TEXT\.clearCursor/);
 assert.match(panelSource, /const CURSOR_ALTITUDE_LABEL = "高度"/);
+assert.match(panelSource, /const CURSOR_SECTION_TIME_LABEL = "セクションタイム"/);
 assert.match(panelSource, /baselineDisplayY=\{reference\.coordinate_system\.relative_elevation\.baseline_display_y\}/);
 assert.match(panelSource, /getRelativeHeightM\(displayY, baselineDisplayY\)/);
 assert.match(panelSource, /Math\.round\(getRelativeHeightM\(displayY, baselineDisplayY\)\)/);
+assert.match(panelSource, /sectionSummaries=\{projectedLap\.sectionSummaries\}/);
+assert.match(panelSource, /sectionSummaries\.find\(\(summary\) => summary\.sectionId === point\.sectionId\)/);
+assert.match(panelSource, /summary\.sampleCount <= 0/);
+assert.match(panelSource, /return "N\/A"/);
+assert.match(panelSource, /speedDisplayUnit: SpeedDisplayUnit/);
+assert.match(panelSource, /formatSpeedReadout\(point\.speedKmh, speedDisplayUnit\)/);
+assert.match(panelSource, /unit: speedUnitLabel\(speedDisplayUnit\)/);
+assert.match(panelSource, /formatValueLabel: \(value: number\) => speedLegendValueLabel\(value, speedDisplayUnit\)/);
 assert.doesNotMatch(panelSource, /COURSE_ELEVATION_DISPLAY_SCALE|elevationScale/, "cursor altitude should not use the 5x map display scale");
 assert.ok(
   panelSource.indexOf("<dt>{CHART_TEXT.distance}</dt>") < panelSource.indexOf("<dt>{CHART_TEXT.section}</dt>") &&
     panelSource.indexOf("<dt>{CHART_TEXT.section}</dt>") < panelSource.indexOf("<dt>{CURSOR_ALTITUDE_LABEL}</dt>") &&
     panelSource.indexOf("<dt>{CURSOR_ALTITUDE_LABEL}</dt>") < panelSource.indexOf("<dt>{CHART_TEXT.lapTime}</dt>"),
   "cursor readout should show distance, section, altitude, then lap time",
+);
+assert.ok(
+  panelSource.indexOf("<dt>Steering</dt>") < panelSource.indexOf("<dt>{CURSOR_SECTION_TIME_LABEL}</dt>"),
+  "section time should be the final cursor readout value",
+);
+assert.deepEqual(
+  [...panelSource.matchAll(/data-field="([^"]+)"/g)].map((match) => match[1]),
+  ["distance", "section", "altitude", "lap-time", "speed", "throttle", "brake", "steering", "section-time"],
 );
 assert.doesNotMatch(appSource, /UI_TEXT\.loadCsvManually|manualCsvDescription|projectedLapInputRef|handleProjectedLapFile/);
 assert.doesNotMatch(appSource, /accept="\.csv,text\/csv"|type="file"/);
@@ -171,6 +195,7 @@ assert.match(panelSource, /showRewindLabels=\{layout\.showRewindLabels\}/);
 assert.match(panelSource, /markers=\{reference\.markers\}/);
 assert.match(canvasSource, /for \(const marker of markers\)/);
 assert.match(canvasSource, /context\.fillText\(marker\.label/);
+assert.match(canvasSource, /channel\.formatValueLabel \? channel\.formatValueLabel\(value\)/);
 assert.match(canvasSource, /visibleDrawnSamples/s);
 assert.doesNotMatch(canvasSource, /className="telemetry-chart-description"/);
 assert.match(canvasSource, /<small>\{CHART_TEXT\.unavailable\}<\/small>/);
@@ -179,6 +204,29 @@ assert.match(canvasSource, /onHoverPoint\(point\)/);
 assert.match(canvasSource, /onPinPoint\(point\)/);
 assert.match(stylesSource, /\.telemetry-chart-stack\s*\{[^}]*gap:\s*6px/s);
 assert.match(stylesSource, /grid-template-columns:\s*96px minmax\(0, 1fr\)/);
+assert.match(stylesSource, /\.telemetry-cursor-values > div\s*\{[\s\S]*grid-template-columns:\s*max-content minmax\(0, 1fr\);[\s\S]*align-items:\s*baseline;[\s\S]*flex:\s*0 0 var\(--readout-field-width\);/);
+for (const [field, width] of [
+  ["distance", "112px"],
+  ["section", "82px"],
+  ["altitude", "86px"],
+  ["lap-time", "124px"],
+  ["speed", "124px"],
+  ["throttle", "100px"],
+  ["brake", "82px"],
+  ["steering", "104px"],
+  ["section-time", "140px"],
+]) {
+  assert.match(
+    stylesSource,
+    new RegExp(`\\.telemetry-cursor-values > div\\[data-field="${field}"\\]\\s*\\{[\\s\\S]*--readout-field-width:\\s*${width};`),
+  );
+}
+assert.match(stylesSource, /\.telemetry-cursor-values dt,\s*\.telemetry-cursor-values dd\s*\{[\s\S]*white-space:\s*nowrap;/);
+assert.match(stylesSource, /font-variant-numeric:\s*tabular-nums;/);
+assert.match(stylesSource, /font-feature-settings:\s*"tnum" 1;/);
+assert.doesNotMatch(stylesSource, /\.telemetry-cursor-values[\s\S]*nth-child/);
+assert.doesNotMatch(stylesSource, /\.telemetry-cursor-readout[\s\S]{0,1600}overflow-wrap:\s*anywhere/);
+assert.doesNotMatch(stylesSource, /\.telemetry-cursor-readout[\s\S]{0,1600}word-break:\s*break-all/);
 assert.match(stylesSource, /@media \(max-width: 700px\)/);
 const desktopBreakpointBlock = stylesSource.match(/@media \(max-width: 1100px\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
 assert.doesNotMatch(desktopBreakpointBlock, /\.telemetry-chart-track[\s\S]*?grid-template-columns:\s*1fr/);

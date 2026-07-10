@@ -118,6 +118,13 @@ assert.match(appSource, /onClick=\{\(\) => selectSectionForFocus\(section\.id\)\
 assert.match(appSource, /const sectionIsActive = mapDisplayMode === "section-focus" && section\.id === selectedSectionId/);
 assert.match(appSource, /aria-pressed=\{sectionIsActive\}/);
 assert.doesNotMatch(appSource, /aria-pressed=\{section\.id === selectedSectionId\}/);
+assert.match(appSource, /aria-pressed=\{speedDisplayUnit === "hirosue"\}/);
+assert.match(appSource, /setSpeedDisplayUnit\(\(unit\) => unit === "hirosue" \? "kmh" : "hirosue"\)/);
+assert.ok(
+  appSource.indexOf("{UI_TEXT.elevationContext}") < appSource.indexOf("ヒロスエ") &&
+    appSource.indexOf("ヒロスエ") < appSource.indexOf("{UI_TEXT.rewinds}"),
+  "Hirosue toggle should sit between elevation context and rewinds",
+);
 assert.match(appSource, /function navigateToRewindSection\(sectionId: string \| undefined\)/);
 assert.match(appSource, /rewindNavigationDecision\(selectedSectionId, mapDisplayMode, sectionId\)/);
 assert.match(appSource, /setChartRangeMode\("section"\)/);
