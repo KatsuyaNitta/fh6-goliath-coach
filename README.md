@@ -6,6 +6,39 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 
 現時点では、完成済みのドライビングコーチではありません。まずは、基準走行パスと実走行データを同じコース距離上に重ね、区間ごとのタイムや走行ラインの違いを確認できる分析ビューアとして実装しています。
 
+### FH6 Telemetry Logger との関係
+
+FH6 Goliath Coach は、**記録済みテレメトリを処理・分析するアプリケーション**です。Coach 自身は Forza Horizon 6 の UDP Data Out を受信・録画しません。
+
+通常の走行記録には、別 Repository の **FH6 Telemetry Logger**（`FH6_telemetry`）を使用します。
+
+```text
+Forza Horizon 6
+  → UDP Data Out
+  → FH6 Telemetry Logger
+  → completed session
+  → FH6 Goliath Coach
+  → ラップ抽出・投影・可視化・分析
+```
+
+Logger は主に次のファイルを生成します。
+
+```text
+<session_id>.fh6raw
+telemetry.csv
+session.json
+```
+
+完成したセッションは、Coach の次のローカルセッション root に配置します。
+
+```text
+data\local\sessions\<session_id>\
+```
+
+Logger と Coach は別 Repository として管理され、ソースコード上の直接依存ではなく、完成セッションのファイルを介して連携します。Coach が必要とするのは互換性のある完成セッションであり、通常の利用フローでは Logger がそのセッションを生成します。
+
+0 バイトのテレメトリ、保存パケットがない記録、必要ファイルが欠けている記録、`recording_complete` / `recording_state` が完成状態を示さない記録は、有効な分析入力として扱いません。Coach は不完全または不正なセッションを自動処理せず、状態を明示して処理対象から除外します。
+
 ### 現在の実装状況
 
 現在の実装には次の機能が含まれます。
@@ -34,7 +67,7 @@ FH6 Goliath Coach は、Forza Horizon 6 の Goliath コースを、記録済み�
 - 有効ラップ読込み後は、通常ビューのコース表示を実走行ラインへ自動切り替え
 - 総合タイムと S1-S6 区間タイム
 - 選択区間の強調と非選択区間のグレーアウト
-- Telemetry cursor readout での距離、セクション、高度、ラップタイム、Speed、Throttle、Brake、Steering 表示
+- Telemetry cursor readout での距離、セクション、高度、ラップタイム、Speed、Throttle、Brake、Steering、セクションタイム表示
 - 車両情報と Forza 順のチューニング値の保存、読み込み
 
 Three-Pane Analysis Workspace は、左ペインにローカルセッションと車両 / チューニング入力、中央ペインに 3D マップと Telemetry Charts、右ペインに巻き戻し概要、選択中の巻き戻し、Practice Focus などの分析結果を配置します。巻き戻し表示の ON/OFF は分析結果ではなくマップレイヤー操作として扱うため、右ペインではなく中央マップツールバーの `高度ガイド` 近くに置きます。
@@ -98,6 +131,39 @@ S1-S6 の区間タイム合計はラップタイムと約 `0.044 s` 異なりま
 ## English
 
 FH6 Goliath Coach is a browser-based telemetry-analysis and reference-path visualization tool for the Goliath course in Forza Horizon 6.
+
+### Relationship with FH6 Telemetry Logger
+
+FH6 Goliath Coach processes and analyzes **recorded telemetry**. The Coach does not receive or record Forza Horizon 6 UDP Data Out by itself.
+
+The standard recording workflow uses the separate **FH6 Telemetry Logger** repository (`FH6_telemetry`).
+
+```text
+Forza Horizon 6
+  → UDP Data Out
+  → FH6 Telemetry Logger
+  → completed session
+  → FH6 Goliath Coach
+  → lap extraction, projection, visualization, and analysis
+```
+
+The Logger normally produces:
+
+```text
+<session_id>.fh6raw
+telemetry.csv
+session.json
+```
+
+Completed sessions are placed under:
+
+```text
+data\local\sessions\<session_id>\
+```
+
+The Logger and Coach remain separate repositories and processes. They integrate through the completed-session file contract rather than a direct source-code dependency. Compatible completed sessions may be supplied by another process, but the FH6 Telemetry Logger is the standard source.
+
+Zero-byte telemetry, recordings with no saved packets, missing required files, or sessions that are not marked complete are not treated as valid analysis input. The Coach does not auto-process incomplete or invalid sessions.
 
 Current capabilities include a 1 m sampled reference path, S1-S6 sections, internal P1-P5 boundary definitions, continuity-constrained telemetry projection, completed-lap extraction, automatic actual-trace course display after a valid lap is loaded, section timing, a three-pane analysis workspace, synchronized map/chart analysis scope, telemetry charts, selected-section emphasis, Overview map mode, Japanese-first UI Phase 1, and vehicle/tune metadata save/load.
 
@@ -182,6 +248,8 @@ python -m goliath.cli build-reference data\reference\goliath_reference_1m.csv --
 
 ## Process a Local Telemetry Session
 
+This step uses a completed session produced by FH6 Telemetry Logger or another compatible recorder. The Coach itself does not record telemetry.
+
 Raw local telemetry stays outside Git. Place session files under:
 
 ```text
@@ -222,6 +290,7 @@ Current processing is restart-aware:
 - Ambiguous or incomplete recordings are rejected instead of producing a misleading lap.
 
 This keeps invalid short post-finish tails from replacing the actual completed lap.
+
 ## Backend Tests
 
 ```powershell
@@ -274,7 +343,6 @@ The frontend smoke test checks generated reference data, camera transforms, vehi
 cd viewer
 pnpm run build
 ```
-
 
 ## Local Web Session Browser
 
@@ -357,7 +425,7 @@ Loaded projected laps now show four distance-based Canvas telemetry tracks:
 
 The shared x-axis is `course_distance_m`, displayed in kilometres. Use **全周** to inspect the complete lap and return the map to Overview, or **選択セクション** to focus both the charts and map on the currently selected S1-S6 section. Clicking S1-S6 in the map toolbar also switches the charts to that section range. The charts draw subtle S1-S6 background bands, P1-P5 reference marker lines, and rewind event markers.
 
-Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a fixed-size screen-space location HUD on the course. The HUD uses the projected route point as its anchor and shows speed, accelerator, brake, and steering beside the map point while keeping the same pixel size during zoom; it is not a vehicle model and does not represent heading or travel direction. The diamond stays on the exact route position, while the card prefers an above-point quadrant and uses projected-route overlap scoring to avoid covering dense course geometry where practical. Distance, section, elevation, lap time, and telemetry values remain in the accessible lower readout, with `高度` using course-minimum-relative metres and not the map's fixed 5x display scale. Geometry details continue to show heading, gradient, curvature, radius, turn direction, slope direction, and quality values separately. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
+Hovering a chart shows one synchronized crosshair across the chart stack, updates the DOM cursor readout, and places a fixed-size screen-space location HUD on the course. The HUD uses the projected route point as its anchor and shows speed, accelerator, brake, and steering beside the map point while keeping the same pixel size during zoom; it is not a vehicle model and does not represent heading or travel direction. The diamond stays on the exact route position, while the card prefers an above-point quadrant and uses projected-route overlap scoring to avoid covering dense course geometry where practical. Distance, section, elevation, lap time, telemetry values, and the current section's completed section time remain in the accessible lower readout. `高度` uses course-minimum-relative metres and not the map's fixed 5x display scale. Geometry details continue to show heading, gradient, curvature, radius, turn direction, slope direction, and quality values separately. Clicking pins the nearest effective telemetry point and updates the selected section; **Clear cursor** removes the pinned point. Cursor interaction does not reset, reframe, pan, rotate, or zoom the camera.
 
 ## Practice Focus Candidates
 
@@ -376,15 +444,16 @@ $env:PYTHONPATH="$PWD\backend"
 ```
 
 Chart decimation is display-only. It preserves bucket first/last samples and channel extrema so short brake pulses, throttle lifts, and steering extremes remain visible without changing analysis data.
+
 ## Managed Local Sessions
 
-FH6_telemetry can finalize recordings into the local Goliath Coach handoff area:
+FH6 Telemetry Logger (`FH6_telemetry`) can finalize recordings into the local Goliath Coach handoff area:
 
 ```text
-G:\github\fh6-goliath-coach\data\local\sessions\<session_id>\
+data\local\sessions\<session_id>\
 ```
 
-Goliath Coach treats this folder as read-only source input. Active logger recordings under `data\local\recording` are not discovered, and sessions are never processed automatically.
+Goliath Coach treats this folder as read-only source input. Active Logger recordings under `data\local\recording` are not discovered, and sessions are never processed automatically.
 
 Useful PowerShell commands:
 
