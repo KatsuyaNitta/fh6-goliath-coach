@@ -313,6 +313,27 @@ cd viewer
 pnpm install
 ```
 
+## Windows Development Launcher
+
+After the Python virtual environment and Viewer dependencies have been set up, Windows users can start the development environment with the launcher in the Repository root:
+
+```text
+Start-FH6-Goliath-Coach-Dev.cmd
+```
+
+The launcher:
+
+- resolves the Repository root from the location of the `.cmd` file and does not depend on a fixed drive or absolute path;
+- starts the API server at `http://127.0.0.1:8765`;
+- starts the Vite Viewer at `http://127.0.0.1:5173`;
+- waits for both services to become ready;
+- opens the Viewer in the default browser;
+- avoids starting duplicate API or Viewer processes when the expected local endpoints are already available.
+
+To stop the development servers, press `Ctrl+C` in the API and Viewer PowerShell windows, or close those windows.
+
+This is a development launcher for a source checkout. It is not a production or end-user packaged launcher.
+
 ## Start Development Server
 
 ```powershell
